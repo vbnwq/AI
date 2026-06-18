@@ -96,6 +96,14 @@ def index():
     return HTMLResponse("<h1>Free AI Studio</h1><p>UI not found.</p>")
 
 
+@app.get("/favicon.ico")
+def favicon():
+    ico = os.path.join(STATIC_DIR, "icon.ico")
+    if os.path.exists(ico):
+        return FileResponse(ico)
+    return JSONResponse({}, status_code=204)
+
+
 @app.get("/api/health")
 def health():
     return {
