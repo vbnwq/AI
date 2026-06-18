@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Free AI Studio — عکس‌ساز و فیلم‌ساز رایگان</title>
+<style>
+  :root{
+    --bg:#0a0e1a; --bg2:#121a2e; --card:#161f38; --card2:#1d2942;
+    --accent:#6c5ce7; --accent2:#00d2ff; --accent3:#ff6b9d;
+    --text:#eef2ff; --muted:#9aa7c7; --ok:#2ecc71; --err:#ff5470;
+    --border:#26324f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:'Vazirmatn',system-ui,'Segoe UI',Tahoma,sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%,#1b2547 0%,transparent 60%),
+               radial-gradient(900px 500px at -10% 110%,#2a1740 0%,transparent 55%),
+               var(--bg);
+    color:var(--text); min-height:100vh; line-height:1.7;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 60px}
+  header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
+  .logo{
+    width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent2));
+    font-size:28px;box-shadow:0 8px 30px rgba(108,92,231,.45)
+  }
+  h1{font-size:26px;font-weight:800;letter-spacing:-.3px}
+  .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
+  .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ok);
+    background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);
+    padding:3px 10px;border-radius:20px;margin-top:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+
+  .tabs{display:flex;gap:10px;margin:22px 0 18px;background:var(--card);
+    padding:6px;border-radius:16px;border:1px solid var(--border);width:fit-content}
+  .tab{padding:10px 22px;border-radius:11px;cursor:pointer;font-weight:700;font-size:14.5px;
+    color:var(--muted);transition:.2s;border:none;background:transparent}
+  .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
+    box-shadow:0 6px 20px rgba(108,92,231,.4)}
+
+  .card{background:linear-gradient(180deg,var(--card),var(--bg2));
+    border:1px solid var(--border);border-radius:20px;padding:24px;margin-bottom:20px;
+    box-shadow:0 20px 50px rgba(0,0,0,.3)}
+  label{display:block;font-size:13.5px;color:var(--muted);margin:14px 0 7px;font-weight:600}
+  textarea,input,select{width:100%;background:#0d1426;border:1px solid var(--border);
+    color:var(--text);border-radius:12px;padding:13px 15px;font-size:15px;
+    font-family:inherit;outline:none;transition:.2s}
+  textarea{min-height:110px;resize:vertical;line-height:1.8}
+  textarea:focus,input:focus,select:focus{border-color:var(--accent2);
+    box-shadow:0 0 0 3px rgba(0,210,255,.12)}
+  .row{display:flex;gap:14px;flex-wrap:wrap}
+  .row>div{flex:1;min-width:160px}
+
+  .opts{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .chip{padding:9px 16px;border:1px solid var(--border);border-radius:11px;cursor:pointer;
+    font-size:13.5px;font-weight:600;color:var(--muted);background:#0d1426;transition:.18s;user-select:none}
+  .chip.active{border-color:var(--accent2);color:#fff;background:rgba(0,210,255,.12)}
+
+  .btn{margin-top:20px;width:100%;padding:15px;border:none;border-radius:14px;
+    font-size:16.5px;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent3));
+    box-shadow:0 12px 30px rgba(108,92,231,.45);transition:.2s;font-family:inherit}
+  .btn:hover{transform:translateY(-2px);filter:brightness(1.08)}
+  .btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+
+  .progress{display:none;margin-top:22px;background:var(--card2);border-radius:16px;
+    padding:18px;border:1px solid var(--border)}
+  .progress.show{display:block}
+  .pbar-track{height:11px;background:#0a1122;border-radius:10px;overflow:hidden;margin:10px 0}
+  .pbar{height:100%;width:0;border-radius:10px;
+    background:linear-gradient(90deg,var(--accent2),var(--accent),var(--accent3));
+    transition:width .4s ease;background-size:200% 100%;animation:flow 2s linear infinite}
+  @keyframes flow{0%{background-position:0 0}100%{background-position:200% 0}}
+  .pmsg{font-size:13.5px;color:var(--muted)}
+  .pct{float:left;font-weight:800;color:var(--accent2)}
+
+  .results{margin-top:22px}
+  .imgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+  .imgrid img{width:100%;border-radius:14px;border:1px solid var(--border);cursor:zoom-in}
+  video{width:100%;border-radius:16px;border:1px solid var(--border);background:#000;margin-top:6px}
+  .dl{display:inline-block;margin-top:14px;padding:11px 22px;border-radius:11px;
+    background:linear-gradient(135deg,var(--ok),#27ae60);color:#fff;text-decoration:none;
+    font-weight:800;font-size:14.5px}
+  .err{color:var(--err);background:rgba(255,84,112,.1);border:1px solid rgba(255,84,112,.3);
+    padding:12px 14px;border-radius:12px;margin-top:14px;font-size:14px}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+  footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:30px;line-height:2}
+  .scenebox{background:#0d1426;border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px;margin-top:10px;font-size:13px;color:var(--muted);max-height:160px;overflow:auto}
+  a{color:var(--accent2)}
+</style>
+<link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">🎬</div>
+    <div>
+      <h1>Free AI Studio</h1>
+      <div class="sub">عکس‌ساز و فیلم‌ساز هوشمند — کاملاً رایگان، بدون نیاز به API</div>
+      <span class="badge"><span class="dot"></span><span id="healthtxt">در حال اتصال به هوش مصنوعی‌ها…</span></span>
+    </div>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="video">🎥 فیلم‌ساز</button>
+    <button class="tab" data-tab="image">🖼️ عکس‌ساز</button>
+  </div>
+
+  <!-- ============ VIDEO ============ -->
+  <div id="tab-video" class="card">
+    <label>موضوع ویدیو — بنویس چی می‌خوای 👇</label>
+    <textarea id="v-topic" placeholder="مثال: یک ویدیوی آموزشی درباره فرق لینوکس با ویندوز بساز و کامل توضیح بده"></textarea>
+    <div class="hint">هوش مصنوعی خودش تحقیق می‌کند، سناریو می‌نویسد، تصویر می‌سازد، صدا تولید می‌کند و ویدیوی کامل را می‌سازد.</div>
+
+    <div class="row">
+      <div>
+        <label>مدت زمان ویدیو</label>
+        <select id="v-duration">
+          <option value="30">۳۰ ثانیه</option>
+          <option value="60" selected>۱ دقیقه</option>
+          <option value="90">۱.۵ دقیقه</option>
+          <option value="120">۲ دقیقه</option>
+          <option value="180">۳ دقیقه</option>
+        </select>
+      </div>
+      <div>
+        <label>زبان صدا (گوینده)</label>
+        <select id="v-lang">
+          <option value="fa">فارسی</option>
+          <option value="en" selected>انگلیسی</option>
+          <option value="ar">عربی</option>
+          <option value="tr">ترکی</option>
+          <option value="de">آلمانی</option>
+          <option value="fr">فرانسوی</option>
+          <option value="es">اسپانیایی</option>
+          <option value="ru">روسی</option>
+        </select>
+      </div>
+    </div>
+
+    <label>کیفیت / ابعاد خروجی</label>
+    <div class="opts" id="v-res">
+      <div class="chip active" data-val="1280x720">۷۲۰p افقی (1280×720)</div>
+      <div class="chip" data-val="1920x1080">۱۰۸۰p افقی (1920×1080)</div>
+      <div class="chip" data-val="1080x1920">عمودی استوری (1080×1920)</div>
+    </div>
+
+    <button class="btn" id="v-btn">🚀 ساختن ویدیو</button>
+
+    <div class="progress" id="v-prog">
+      <div class="pmsg"><span class="pct" id="v-pct">0%</span><span id="v-msg">شروع…</span></div>
+      <div class="pbar-track"><div class="pbar" id="v-bar"></div></div>
+      <div class="hint">ساخت ویدیو بسته به طول و کیفیت ممکن است چند دقیقه طول بکشد. لطفاً صفحه را نبندید.</div>
+    </div>
+
+    <div class="results" id="v-results"></div>
+  </div>
+
+  <!-- ============ IMAGE ============ -->
+  <div id="tab-image" class="card" style="display:none">
+    <label>توضیح عکس — چی می‌خوای ساخته بشه؟ 👇</label>
+    <textarea id="i-prompt" placeholder="مثال: یک شهر آینده‌نگرانه با ماشین‌های پرنده و نورهای نئونی در شب، سینمایی و باکیفیت"></textarea>
+
+    <div class="row">
+      <div>
+        <label>ابعاد</label>
+        <select id="i-res">
+          <option value="1024x1024">مربع (1024×1024)</option>
+          <option value="1280x720">افقی (1280×720)</option>
+          <option value="1920x1080">افقی HD (1920×1080)</option>
+          <option value="1080x1920">عمودی (1080×1920)</option>
+          <option value="720x1280">عمودی (720×1280)</option>
+        </select>
+      </div>
+      <div>
+        <label>تعداد</label>
+        <select id="i-count">
+          <option value="1">۱ عکس</option>
+          <option value="2">۲ عکس</option>
+          <option value="3">۳ عکس</option>
+          <option value="4">۴ عکس</option>
+        </select>
+      </div>
+      <div>
+        <label>مدل</label>
+        <select id="i-model">
+          <option value="flux">Flux (باکیفیت)</option>
+          <option value="turbo">Turbo (سریع)</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn" id="i-btn">✨ ساختن عکس</button>
+
+    <div class="progress" id="i-prog">
+      <div class="pmsg"><span class="pct" id="i-pct">0%</span><span id="i-msg">شروع…</span></div>
+      <div class="pbar-track"><div class="pbar" id="i-bar"></div></div>
+    </div>
+
+    <div class="results imgrid" id="i-results"></div>
+  </div>
+
+  <footer>
+    ساخته‌شده با هوش مصنوعی‌های رایگان: Pollinations (تصویر/متن) · Microsoft Edge TTS (صدا) · FFmpeg (ویدیو)<br>
+    بدون نیاز به API Key — کاملاً رایگان ✦
+  </footer>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+// Tabs
+$$('.tab').forEach(t => t.onclick = () => {
+  $$('.tab').forEach(x => x.classList.remove('active'));
+  t.classList.add('active');
+  const tab = t.dataset.tab;
+  $('#tab-video').style.display = tab==='video' ? 'block':'none';
+  $('#tab-image').style.display = tab==='image' ? 'block':'none';
+});
+
+// Chip selectors
+function chipGroup(sel){
+  $$(sel+' .chip').forEach(c => c.onclick = () => {
+    $$(sel+' .chip').forEach(x=>x.classList.remove('active'));
+    c.classList.add('active');
+  });
+}
+chipGroup('#v-res');
+function getChip(sel){ const a=$(sel+' .chip.active'); return a?a.dataset.val:null; }
+
+// Health check
+fetch('/api/health').then(r=>r.json()).then(d=>{
+  $('#healthtxt').textContent = 'متصل · ' + Object.keys(d.sources).length + ' هوش مصنوعی رایگان فعال';
+}).catch(()=>{ $('#healthtxt').textContent='آفلاین'; });
+
+// ---- Polling ----
+function poll(jobId, onUpdate){
+  const iv = setInterval(async ()=>{
+    try{
+      const r = await fetch('/api/job/'+jobId);
+      const j = await r.json();
+      onUpdate(j);
+      if(j.status==='done' || j.status==='error'){ clearInterval(iv); }
+    }catch(e){}
+  }, 1500);
+}
+
+// ===== VIDEO =====
+$('#v-btn').onclick = async () => {
+  const topic = $('#v-topic').value.trim();
+  if(!topic){ alert('لطفاً موضوع ویدیو را بنویسید'); return; }
+  const body = {
+    topic,
+    duration: parseInt($('#v-duration').value),
+    resolution: getChip('#v-res'),
+    language: $('#v-lang').value,
+  };
+  $('#v-btn').disabled = true;
+  $('#v-prog').classList.add('show');
+  $('#v-results').innerHTML = '';
+  $('#v-bar').style.width='3%'; $('#v-pct').textContent='3%'; $('#v-msg').textContent='ارسال درخواست…';
+
+  try{
+    const r = await fetch('/api/video',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const {job_id} = await r.json();
+    poll(job_id, j => {
+      $('#v-bar').style.width = (j.progress||0)+'%';
+      $('#v-pct').textContent = (j.progress||0)+'%';
+      $('#v-msg').textContent = j.message||'';
+      if(j.status==='done'){
+        $('#v-btn').disabled=false;
+        const res = j.results[j.results.length-1];
+        let scenesHtml='';
+        if(res.script && res.script.scenes){
+          scenesHtml = '<div class="scenebox"><b>سناریو ('+res.scenes+' صحنه):</b><br>'+
+            res.script.scenes.map((s,i)=>'• '+(s.caption||('صحنه '+(i+1)))).join('<br>')+'</div>';
+        }
+        $('#v-results').innerHTML =
+          '<h3 style="margin-bottom:10px">✅ '+(res.title||'ویدیوی شما آماده شد')+'</h3>'+
+          '<video controls src="'+res.url+'"></video>'+
+          '<a class="dl" href="'+res.url+'" download>⬇️ دانلود ویدیو</a>'+
+          scenesHtml;
+      }
+      if(j.status==='error'){
+        $('#v-btn').disabled=false;
+        $('#v-results').innerHTML = '<div class="err">❌ خطا: '+(j.error||'نامشخص')+'<br>لطفاً دوباره تلاش کنید.</div>';
+      }
+    });
+  }catch(e){
+    $('#v-btn').disabled=false;
+    $('#v-results').innerHTML = '<div class="err">❌ '+e.message+'</div>';
+  }
+};
+
+// ===== IMAGE =====
+$('#i-btn').onclick = async () => {
+  const prompt = $('#i-prompt').value.trim();
+  if(!prompt){ alert('لطفاً توضیح عکس را بنویسید'); return; }
+  const [w,h] = $('#i-res').value.split('x').map(Number);
+  const body = { prompt, width:w, height:h, count:parseInt($('#i-count').value), model:$('#i-model').value };
+  $('#i-btn').disabled=true;
+  $('#i-prog').classList.add('show');
+  $('#i-results').innerHTML='';
+  $('#i-bar').style.width='5%'; $('#i-pct').textContent='5%'; $('#i-msg').textContent='در حال ساخت…';
+
+  try{
+    const r = await fetch('/api/image',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const {job_id} = await r.json();
+    poll(job_id, j=>{
+      $('#i-bar').style.width=(j.progress||0)+'%';
+      $('#i-pct').textContent=(j.progress||0)+'%';
+      $('#i-msg').textContent=j.message||'';
+      if(j.results && j.results.length){
+        $('#i-results').innerHTML = j.results.map(im =>
+          '<a href="'+im.url+'" download><img src="'+im.url+'" loading="lazy"></a>').join('');
+      }
+      if(j.status==='done'){ $('#i-btn').disabled=false; }
+      if(j.status==='error'){
+        $('#i-btn').disabled=false;
+        $('#i-results').innerHTML='<div class="err">❌ خطا: '+(j.error||'نامشخص')+'</div>';
+      }
+    });
+  }catch(e){
+    $('#i-btn').disabled=false;
+    $('#i-results').innerHTML='<div class="err">❌ '+e.message+'</div>';
+  }
+};
+</script>
+</body>
+</html>

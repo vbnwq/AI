@@ -1,0 +1,22 @@
+# Build artifacts
+build/
+dist/
+*.spec.bak
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Generated outputs (keep dir, ignore contents)
+output/images/*
+output/videos/*
+output/temp/*
+output/*.log
+!output/.gitkeep
+
+# Bundled ffmpeg (downloaded by build script)
+ffmpeg/
+
+# OS
+.DS_Store
+Thumbs.db
