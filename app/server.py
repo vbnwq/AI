@@ -59,6 +59,7 @@ class VideoReq(BaseModel):
     resolution: str = "1280x720"
     language: str = "en"
     voice: str | None = None
+    gender: str | None = None   # "male" | "female" | None
     image_model: str = "flux"
 
 
@@ -199,7 +200,7 @@ def _run_video_job(jid, req: VideoReq):
             script, resolution=req.resolution, language=req.language,
             voice=req.voice, workdir=workdir, out_path=out_path,
             progress_cb=progress_cb, image_model=req.image_model,
-            tts_rate=rate)
+            tts_rate=rate, gender=req.gender)
 
         update_job(jid, status="done", progress=100, stage="done",
                    message="Video ready!",

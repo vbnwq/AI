@@ -200,7 +200,7 @@ def _concat_clips(clip_paths, out_path):
 
 def build_video(script, resolution="1280x720", language="en", voice=None,
                 workdir=None, out_path=None, progress_cb=None, image_model="flux",
-                tts_rate="+0%"):
+                tts_rate="+0%", gender=None):
     """
     script: dict {title, scenes:[{narration, image_prompt, caption}]}
     Returns final video path.
@@ -245,7 +245,8 @@ def build_video(script, resolution="1280x720", language="en", voice=None,
     def do_tts(i):
         try:
             ai_tts.synthesize(scenes[i]["narration"], aud_paths[i],
-                              language=language, voice=voice, rate=tts_rate)
+                              language=language, voice=voice, rate=tts_rate,
+                              gender=gender)
         except Exception:
             _make_silence(aud_paths[i], 4.0)
         with lock:

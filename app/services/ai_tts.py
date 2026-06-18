@@ -31,10 +31,37 @@ VOICE_MAP = {
     "ja": "ja-JP-KeitaNeural",
 }
 
+# Per-language male/female neural voices for explicit gender selection.
+GENDER_VOICES = {
+    "en": {"male": "en-US-GuyNeural", "female": "en-US-AriaNeural"},
+    "fa": {"male": "fa-IR-FaridNeural", "female": "fa-IR-DilaraNeural"},
+    "ar": {"male": "ar-SA-HamedNeural", "female": "ar-SA-ZariyahNeural"},
+    "es": {"male": "es-ES-AlvaroNeural", "female": "es-ES-ElviraNeural"},
+    "fr": {"male": "fr-FR-HenriNeural", "female": "fr-FR-DeniseNeural"},
+    "de": {"male": "de-DE-ConradNeural", "female": "de-DE-KatjaNeural"},
+    "tr": {"male": "tr-TR-AhmetNeural", "female": "tr-TR-EmelNeural"},
+    "ru": {"male": "ru-RU-DmitryNeural", "female": "ru-RU-SvetlanaNeural"},
+    "hi": {"male": "hi-IN-MadhurNeural", "female": "hi-IN-SwaraNeural"},
+    "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
+    "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"},
+}
 
-def pick_voice(language="en", voice=None):
+
+def pick_voice(language="en", voice=None, gender=None):
+    """Resolve a concrete neural voice.
+
+    Priority: explicit voice id > gender selection for language > default.
+    """
     if voice:
-        return voice
+        # treat 'male'/'female' passed in the voice slot as gender too
+        if voice in ("male", "female"):
+            gender = voice
+        else:
+            return voice
+    if gender in ("male", "female"):
+        g = GENDER_VOICES.get(language)
+        if g:
+            return g[gender]
     return VOICE_MAP.get(language, "en-US-AriaNeural")
 
 
@@ -103,7 +130,8 @@ def get_audio_duration(path):
         return 0.0
 
 
-def synthesize(text, out_path, language="en", voice=None, rate="+0%", pitch="+0Hz"):
+def synthesize(text, out_path, language="en", voice=None, rate="+0%",
+               pitch="+0Hz", gender=None):
     """
     Convert text to speech mp3 at out_path.
     Returns (out_path, duration_seconds).
@@ -112,7 +140,7 @@ def synthesize(text, out_path, language="en", voice=None, rate="+0%", pitch="+0H
     if not text:
         raise ValueError("Empty text for TTS")
 
-    chosen_voice = pick_voice(language, voice)
+    chosen_voice = pick_voice(language, voice, gender)
 
     # Try edge-tts first
     try:

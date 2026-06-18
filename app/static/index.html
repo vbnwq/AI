@@ -139,6 +139,13 @@
           <option value="ru">روسی</option>
         </select>
       </div>
+      <div>
+        <label>جنسیت گوینده</label>
+        <select id="v-gender">
+          <option value="female" selected>زن</option>
+          <option value="male">مرد</option>
+        </select>
+      </div>
     </div>
 
     <label>کیفیت / ابعاد خروجی</label>
@@ -258,6 +265,7 @@ $('#v-btn').onclick = async () => {
     duration: parseInt($('#v-duration').value),
     resolution: getChip('#v-res'),
     language: $('#v-lang').value,
+    gender: $('#v-gender').value,
   };
   $('#v-btn').disabled = true;
   $('#v-prog').classList.add('show');
