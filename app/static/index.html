@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Free AI Studio — عکس‌ساز و فیلم‌ساز رایگان</title>
+<title>Free AI Studio — استودیوی هوش مصنوعی فارسی (رایگان)</title>
 <link rel="icon" type="image/png" href="/static/icon.png">
 <style>
   :root{
@@ -20,13 +20,11 @@
                var(--bg);
     color:var(--text); min-height:100vh; line-height:1.7;
   }
-  .wrap{max-width:1100px;margin:0 auto;padding:24px 18px 60px}
+  .wrap{max-width:1150px;margin:0 auto;padding:24px 18px 60px}
   header{display:flex;align-items:center;gap:14px;margin-bottom:8px}
-  .logo{
-    width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
+  .logo{width:54px;height:54px;border-radius:15px;display:grid;place-items:center;
     background:linear-gradient(135deg,var(--accent),var(--accent2));
-    font-size:28px;box-shadow:0 8px 30px rgba(108,92,231,.45)
-  }
+    font-size:28px;box-shadow:0 8px 30px rgba(108,92,231,.45)}
   h1{font-size:26px;font-weight:800;letter-spacing:-.3px}
   .sub{color:var(--muted);font-size:13.5px;margin-top:2px}
   .badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ok);
@@ -35,7 +33,7 @@
   .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
 
   .tabs{display:flex;gap:10px;margin:22px 0 18px;background:var(--card);
-    padding:6px;border-radius:16px;border:1px solid var(--border);width:fit-content}
+    padding:6px;border-radius:16px;border:1px solid var(--border);width:fit-content;flex-wrap:wrap}
   .tab{padding:10px 22px;border-radius:11px;cursor:pointer;font-weight:700;font-size:14.5px;
     color:var(--muted);transition:.2s;border:none;background:transparent}
   .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;
@@ -52,7 +50,7 @@
   textarea:focus,input:focus,select:focus{border-color:var(--accent2);
     box-shadow:0 0 0 3px rgba(0,210,255,.12)}
   .row{display:flex;gap:14px;flex-wrap:wrap}
-  .row>div{flex:1;min-width:160px}
+  .row>div{flex:1;min-width:150px}
 
   .opts{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
   .chip{padding:9px 16px;border:1px solid var(--border);border-radius:11px;cursor:pointer;
@@ -79,18 +77,52 @@
 
   .results{margin-top:22px}
   .imgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-  .imgrid img{width:100%;border-radius:14px;border:1px solid var(--border);cursor:zoom-in}
-  video{width:100%;border-radius:16px;border:1px solid var(--border);background:#000;margin-top:6px}
-  .dl{display:inline-block;margin-top:14px;padding:11px 22px;border-radius:11px;
+  .imgcell{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+  .imgcell img{width:100%;display:block;cursor:zoom-in;transition:.2s}
+  .imgcell:hover img{filter:brightness(1.05)}
+  .imgcell .dlmini{position:absolute;bottom:8px;left:8px;background:rgba(8,12,26,.85);
+    color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12.5px;font-weight:700;
+    cursor:pointer;font-family:inherit;backdrop-filter:blur(4px)}
+  video{width:100%;border-radius:16px;border:1px solid var(--border);background:#000;margin-top:6px;cursor:zoom-in}
+  .dlrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .dl{display:inline-flex;align-items:center;gap:6px;padding:11px 20px;border-radius:11px;
     background:linear-gradient(135deg,var(--ok),#27ae60);color:#fff;text-decoration:none;
-    font-weight:800;font-size:14.5px}
+    font-weight:800;font-size:14.5px;cursor:pointer;border:none;font-family:inherit}
+  .dl.alt{background:linear-gradient(135deg,var(--accent),var(--accent2))}
+  .dl.ghost{background:#0d1426;border:1px solid var(--border);color:var(--text)}
   .err{color:var(--err);background:rgba(255,84,112,.1);border:1px solid rgba(255,84,112,.3);
     padding:12px 14px;border-radius:12px;margin-top:14px;font-size:14px}
   .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
   footer{text-align:center;color:var(--muted);font-size:12.5px;margin-top:30px;line-height:2}
   .scenebox{background:#0d1426;border:1px solid var(--border);border-radius:12px;
-    padding:12px 14px;margin-top:10px;font-size:13px;color:var(--muted);max-height:160px;overflow:auto}
+    padding:12px 14px;margin-top:12px;font-size:13px;color:var(--muted);max-height:180px;overflow:auto}
   a{color:var(--accent2)}
+
+  /* History */
+  .htoolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px}
+  .hitem{display:flex;gap:14px;align-items:center;background:#0d1426;border:1px solid var(--border);
+    border-radius:14px;padding:12px;margin-bottom:12px}
+  .hthumb{width:96px;height:64px;border-radius:10px;object-fit:cover;background:#070b16;flex:none;cursor:zoom-in}
+  .hmeta{flex:1;min-width:0}
+  .hmeta .ht{font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hmeta .hd{font-size:12px;color:var(--muted);margin-top:3px}
+  .hbtns{display:flex;gap:8px;flex-wrap:wrap}
+  .iconbtn{background:#0d1426;border:1px solid var(--border);color:var(--text);border-radius:9px;
+    padding:8px 12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit}
+  .iconbtn.del{color:var(--err);border-color:rgba(255,84,112,.4)}
+  .empty{text-align:center;color:var(--muted);padding:30px 10px;font-size:14px}
+
+  /* Lightbox / media viewer */
+  .lb{position:fixed;inset:0;background:rgba(3,6,14,.94);display:none;z-index:99;
+    align-items:center;justify-content:center;flex-direction:column;padding:20px}
+  .lb.show{display:flex}
+  .lb img,.lb video{max-width:96vw;max-height:84vh;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);
+    transition:transform .15s ease;cursor:grab}
+  .lb-bar{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+  .lb-bar button{background:#161f38;border:1px solid var(--border);color:#fff;border-radius:10px;
+    padding:10px 16px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit}
+  .lb-close{position:absolute;top:16px;left:16px;font-size:26px;background:#161f38;border:1px solid var(--border);
+    color:#fff;width:46px;height:46px;border-radius:50%;cursor:pointer}
 </style>
 <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet">
 </head>
@@ -100,7 +132,7 @@
     <div class="logo">🎬</div>
     <div>
       <h1>Free AI Studio</h1>
-      <div class="sub">عکس‌ساز و فیلم‌ساز هوشمند — کاملاً رایگان، بدون نیاز به API</div>
+      <div class="sub">استودیوی هوش مصنوعی فارسی — عکس‌ساز و فیلم‌ساز · کاملاً رایگان، بدون API</div>
       <span class="badge"><span class="dot"></span><span id="healthtxt">در حال اتصال به هوش مصنوعی‌ها…</span></span>
     </div>
   </header>
@@ -108,17 +140,18 @@
   <div class="tabs">
     <button class="tab active" data-tab="video">🎥 فیلم‌ساز</button>
     <button class="tab" data-tab="image">🖼️ عکس‌ساز</button>
+    <button class="tab" data-tab="history">🗂️ تاریخچه</button>
   </div>
 
   <!-- ============ VIDEO ============ -->
   <div id="tab-video" class="card">
-    <label>موضوع ویدیو — بنویس چی می‌خوای 👇</label>
-    <textarea id="v-topic" placeholder="مثال: یک ویدیوی آموزشی درباره فرق لینوکس با ویندوز بساز و کامل توضیح بده"></textarea>
-    <div class="hint">هوش مصنوعی خودش تحقیق می‌کند، سناریو می‌نویسد، تصویر می‌سازد، صدا تولید می‌کند و ویدیوی کامل را می‌سازد.</div>
+    <label>موضوع ویدیو — بنویس چی می‌خوای (به فارسی) 👇</label>
+    <textarea id="v-topic" placeholder="مثال: یک ویدیو درباره فواید خواب کافی بساز و کامل توضیح بده"></textarea>
+    <div class="hint">هوش مصنوعی موضوع را تحلیل می‌کند، سناریوی فارسی می‌نویسد، تصاویر باکیفیت می‌سازد، صدای فارسی تولید می‌کند و زیرنویس فارسی راست‌چین روی تصاویر قرار می‌دهد.</div>
 
     <div class="row">
       <div>
-        <label>مدت زمان ویدیو</label>
+        <label>مدت زمان</label>
         <select id="v-duration">
           <option value="30">۳۰ ثانیه</option>
           <option value="60" selected>۱ دقیقه</option>
@@ -128,10 +161,10 @@
         </select>
       </div>
       <div>
-        <label>زبان صدا (گوینده)</label>
+        <label>زبان گوینده</label>
         <select id="v-lang">
-          <option value="fa">فارسی</option>
-          <option value="en" selected>انگلیسی</option>
+          <option value="fa" selected>فارسی</option>
+          <option value="en">انگلیسی</option>
           <option value="ar">عربی</option>
           <option value="tr">ترکی</option>
           <option value="de">آلمانی</option>
@@ -151,9 +184,17 @@
 
     <label>کیفیت / ابعاد خروجی</label>
     <div class="opts" id="v-res">
-      <div class="chip active" data-val="1280x720">۷۲۰p افقی (1280×720)</div>
-      <div class="chip" data-val="1920x1080">۱۰۸۰p افقی (1920×1080)</div>
-      <div class="chip" data-val="1080x1920">عمودی استوری (1080×1920)</div>
+      <div class="chip" data-val="854x480">۴۸۰p سریع</div>
+      <div class="chip active" data-val="1280x720">۷۲۰p افقی</div>
+      <div class="chip" data-val="1920x1080">۱۰۸۰p Full HD</div>
+      <div class="chip" data-val="1080x1920">عمودی استوری</div>
+    </div>
+
+    <label>سطح کیفیت رندر (برای سیستم‌های ضعیف «سریع» را انتخاب کنید)</label>
+    <div class="opts" id="v-quality">
+      <div class="chip" data-val="fast">⚡ سریع (CPU کم)</div>
+      <div class="chip active" data-val="balanced">⚖️ متعادل</div>
+      <div class="chip" data-val="high">💎 حداکثر کیفیت</div>
     </div>
 
     <button class="btn" id="v-btn">🚀 ساختن ویدیو</button>
@@ -161,7 +202,7 @@
     <div class="progress" id="v-prog">
       <div class="pmsg"><span class="pct" id="v-pct">0%</span><span id="v-msg">شروع…</span></div>
       <div class="pbar-track"><div class="pbar" id="v-bar"></div></div>
-      <div class="hint">ساخت ویدیو بسته به طول و کیفیت ممکن است چند دقیقه طول بکشد. لطفاً صفحه را نبندید.</div>
+      <div class="hint">ساخت ویدیو ممکن است چند دقیقه طول بکشد. لطفاً صفحه را نبندید.</div>
     </div>
 
     <div class="results" id="v-results"></div>
@@ -169,8 +210,9 @@
 
   <!-- ============ IMAGE ============ -->
   <div id="tab-image" class="card" style="display:none">
-    <label>توضیح عکس — چی می‌خوای ساخته بشه؟ 👇</label>
+    <label>توضیح عکس — چی می‌خوای ساخته بشه؟ (به فارسی) 👇</label>
     <textarea id="i-prompt" placeholder="مثال: یک شهر آینده‌نگرانه با ماشین‌های پرنده و نورهای نئونی در شب، سینمایی و باکیفیت"></textarea>
+    <div class="hint">متن فارسی به‌صورت خودکار به انگلیسی ترجمه و برای مدل تصویر بهینه می‌شود تا بهترین نتیجه را بگیرید.</div>
 
     <div class="row">
       <div>
@@ -181,6 +223,7 @@
           <option value="1920x1080">افقی HD (1920×1080)</option>
           <option value="1080x1920">عمودی (1080×1920)</option>
           <option value="720x1280">عمودی (720×1280)</option>
+          <option value="1536x1024">عریض (1536×1024)</option>
         </select>
       </div>
       <div>
@@ -190,6 +233,14 @@
           <option value="2">۲ عکس</option>
           <option value="3">۳ عکس</option>
           <option value="4">۴ عکس</option>
+        </select>
+      </div>
+      <div>
+        <label>کیفیت</label>
+        <select id="i-quality">
+          <option value="standard">استاندارد</option>
+          <option value="high">بالا</option>
+          <option value="ultra" selected>حداکثر (Ultra)</option>
         </select>
       </div>
       <div>
@@ -211,10 +262,29 @@
     <div class="results imgrid" id="i-results"></div>
   </div>
 
+  <!-- ============ HISTORY ============ -->
+  <div id="tab-history" class="card" style="display:none">
+    <div class="htoolbar">
+      <h3>🗂️ تاریخچه ساخته‌ها</h3>
+      <div class="hbtns">
+        <button class="iconbtn" id="h-refresh">🔄 بروزرسانی</button>
+        <button class="iconbtn del" id="h-clear">🗑️ پاک‌کردن همه</button>
+      </div>
+    </div>
+    <div id="h-list"></div>
+  </div>
+
   <footer>
-    ساخته‌شده با هوش مصنوعی‌های رایگان: Pollinations (تصویر/متن) · Microsoft Edge TTS (صدا) · FFmpeg (ویدیو)<br>
-    بدون نیاز به API Key — کاملاً رایگان ✦
+    موتورهای رایگان: Pollinations Flux (تصویر) · موتور سناریوی فارسی · Edge Neural TTS فارسی · FFmpeg + PIL (ویدیو و زیرنویس RTL)<br>
+    بدون نیاز به API Key — کاملاً رایگان · بهینه برای سیستم‌های بدون کارت گرافیک ✦
   </footer>
+</div>
+
+<!-- Lightbox / media viewer -->
+<div class="lb" id="lb">
+  <button class="lb-close" id="lb-close">✕</button>
+  <div id="lb-content"></div>
+  <div class="lb-bar" id="lb-bar"></div>
 </div>
 
 <script>
@@ -228,6 +298,8 @@ $$('.tab').forEach(t => t.onclick = () => {
   const tab = t.dataset.tab;
   $('#tab-video').style.display = tab==='video' ? 'block':'none';
   $('#tab-image').style.display = tab==='image' ? 'block':'none';
+  $('#tab-history').style.display = tab==='history' ? 'block':'none';
+  if(tab==='history') loadHistory();
 });
 
 // Chip selectors
@@ -237,12 +309,12 @@ function chipGroup(sel){
     c.classList.add('active');
   });
 }
-chipGroup('#v-res');
+chipGroup('#v-res'); chipGroup('#v-quality');
 function getChip(sel){ const a=$(sel+' .chip.active'); return a?a.dataset.val:null; }
 
 // Health check
 fetch('/api/health').then(r=>r.json()).then(d=>{
-  $('#healthtxt').textContent = 'متصل · ' + Object.keys(d.sources).length + ' هوش مصنوعی رایگان فعال';
+  $('#healthtxt').textContent = 'متصل · ' + Object.keys(d.sources).length + ' موتور رایگان فعال';
 }).catch(()=>{ $('#healthtxt').textContent='آفلاین'; });
 
 // ---- Polling ----
@@ -257,6 +329,35 @@ function poll(jobId, onUpdate){
   }, 1500);
 }
 
+// ---- Lightbox / media viewer ----
+let lbZoom = 1;
+function openLightbox(kind, url){
+  const c = $('#lb-content'); const bar = $('#lb-bar'); lbZoom=1;
+  if(kind==='video'){
+    c.innerHTML = '<video src="'+url+'" controls autoplay></video>';
+    bar.innerHTML = '<a class="dl" href="/api/download?path='+encodeURIComponent(url)+'">⬇️ دانلود</a>';
+  }else{
+    c.innerHTML = '<img id="lb-img" src="'+url+'">';
+    bar.innerHTML =
+      '<button id="lb-in">➕ بزرگ‌نمایی</button>'+
+      '<button id="lb-out">➖ کوچک‌نمایی</button>'+
+      '<button id="lb-reset">↺ بازنشانی</button>'+
+      '<a class="dl" href="/api/download?path='+encodeURIComponent(url)+'">⬇️ دانلود</a>';
+    const img = $('#lb-img');
+    const apply = ()=> img.style.transform = 'scale('+lbZoom+')';
+    $('#lb-in').onclick = ()=>{ lbZoom=Math.min(5,lbZoom+0.3); apply(); };
+    $('#lb-out').onclick = ()=>{ lbZoom=Math.max(0.4,lbZoom-0.3); apply(); };
+    $('#lb-reset').onclick = ()=>{ lbZoom=1; apply(); };
+    img.onwheel = (e)=>{ e.preventDefault(); lbZoom=Math.min(5,Math.max(0.4,lbZoom+(e.deltaY<0?0.2:-0.2))); apply(); };
+  }
+  $('#lb').classList.add('show');
+}
+$('#lb-close').onclick = ()=> $('#lb').classList.remove('show');
+$('#lb').onclick = (e)=>{ if(e.target.id==='lb') $('#lb').classList.remove('show'); };
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') $('#lb').classList.remove('show'); });
+
+function dlLink(url){ return '/api/download?path='+encodeURIComponent(url); }
+
 // ===== VIDEO =====
 $('#v-btn').onclick = async () => {
   const topic = $('#v-topic').value.trim();
@@ -265,6 +366,7 @@ $('#v-btn').onclick = async () => {
     topic,
     duration: parseInt($('#v-duration').value),
     resolution: getChip('#v-res'),
+    quality: getChip('#v-quality'),
     language: $('#v-lang').value,
     gender: $('#v-gender').value,
   };
@@ -290,9 +392,11 @@ $('#v-btn').onclick = async () => {
         }
         $('#v-results').innerHTML =
           '<h3 style="margin-bottom:10px">✅ '+(res.title||'ویدیوی شما آماده شد')+'</h3>'+
-          '<video controls src="'+res.url+'"></video>'+
-          '<a class="dl" href="'+res.url+'" download>⬇️ دانلود ویدیو</a>'+
-          scenesHtml;
+          '<video src="'+res.url+'" controls onclick="event.preventDefault();openLightbox(\'video\',\''+res.url+'\')"></video>'+
+          '<div class="dlrow">'+
+            '<a class="dl" href="'+dlLink(res.url)+'">⬇️ دانلود ویدیو</a>'+
+            '<button class="dl alt" onclick="openLightbox(\'video\',\''+res.url+'\')">🔍 نمایش تمام‌صفحه</button>'+
+          '</div>'+ scenesHtml;
       }
       if(j.status==='error'){
         $('#v-btn').disabled=false;
@@ -310,7 +414,8 @@ $('#i-btn').onclick = async () => {
   const prompt = $('#i-prompt').value.trim();
   if(!prompt){ alert('لطفاً توضیح عکس را بنویسید'); return; }
   const [w,h] = $('#i-res').value.split('x').map(Number);
-  const body = { prompt, width:w, height:h, count:parseInt($('#i-count').value), model:$('#i-model').value };
+  const body = { prompt, width:w, height:h, count:parseInt($('#i-count').value),
+                 model:$('#i-model').value, quality:$('#i-quality').value };
   $('#i-btn').disabled=true;
   $('#i-prog').classList.add('show');
   $('#i-results').innerHTML='';
@@ -325,7 +430,10 @@ $('#i-btn').onclick = async () => {
       $('#i-msg').textContent=j.message||'';
       if(j.results && j.results.length){
         $('#i-results').innerHTML = j.results.map(im =>
-          '<a href="'+im.url+'" download><img src="'+im.url+'" loading="lazy"></a>').join('');
+          '<div class="imgcell">'+
+            '<img src="'+im.url+'" loading="lazy" onclick="openLightbox(\'image\',\''+im.url+'\')">'+
+            '<button class="dlmini" onclick="location.href=\''+dlLink(im.url)+'\'">⬇️ دانلود</button>'+
+          '</div>').join('');
       }
       if(j.status==='done'){ $('#i-btn').disabled=false; }
       if(j.status==='error'){
@@ -337,6 +445,51 @@ $('#i-btn').onclick = async () => {
     $('#i-btn').disabled=false;
     $('#i-results').innerHTML='<div class="err">❌ '+e.message+'</div>';
   }
+};
+
+// ===== HISTORY =====
+function fmtDate(ts){
+  try{ return new Date(ts*1000).toLocaleString('fa-IR'); }catch(e){ return ''; }
+}
+async function loadHistory(){
+  const list = $('#h-list');
+  list.innerHTML = '<div class="empty">در حال بارگذاری…</div>';
+  try{
+    const r = await fetch('/api/history'); const d = await r.json();
+    const items = d.items||[];
+    if(!items.length){ list.innerHTML='<div class="empty">هنوز چیزی ساخته نشده است.</div>'; return; }
+    list.innerHTML = items.map(it=>{
+      const isVideo = it.kind==='video';
+      const url = (it.files&&it.files[0])||'';
+      const thumb = isVideo
+        ? '<video class="hthumb" src="'+url+'#t=1" muted onclick="openLightbox(\'video\',\''+url+'\')"></video>'
+        : '<img class="hthumb" src="'+url+'" onclick="openLightbox(\'image\',\''+url+'\')">';
+      const dls = (it.files||[]).map((f,i)=>
+        '<a class="iconbtn" href="'+dlLink(f)+'">⬇️ '+(it.files.length>1?('دانلود '+(i+1)):'دانلود')+'</a>').join('');
+      return '<div class="hitem">'+thumb+
+        '<div class="hmeta">'+
+          '<div class="ht">'+(isVideo?'🎥 ':'🖼️ ')+(it.title||it.prompt||'')+'</div>'+
+          '<div class="hd">'+(it.size||'')+' · '+(it.quality||'')+(isVideo?(' · '+(it.scenes||0)+' صحنه'):'')+' · '+fmtDate(it.created)+'</div>'+
+        '</div>'+
+        '<div class="hbtns">'+
+          '<button class="iconbtn" onclick="openLightbox(\''+(isVideo?'video':'image')+'\',\''+url+'\')">🔍 نمایش</button>'+
+          dls+
+          '<button class="iconbtn del" onclick="delHistory(\''+it.id+'\')">🗑️ حذف</button>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){ list.innerHTML='<div class="empty">خطا در بارگذاری تاریخچه.</div>'; }
+}
+async function delHistory(id){
+  if(!confirm('این مورد و فایل‌هایش حذف شود؟')) return;
+  await fetch('/api/history/'+id,{method:'DELETE'});
+  loadHistory();
+}
+$('#h-refresh').onclick = loadHistory;
+$('#h-clear').onclick = async ()=>{
+  if(!confirm('کل تاریخچه و همه فایل‌ها حذف شود؟')) return;
+  await fetch('/api/history',{method:'DELETE'});
+  loadHistory();
 };
 </script>
 </body>

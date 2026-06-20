@@ -29,8 +29,11 @@ hiddenimports += [
     "anyio", "h11", "websockets", "httptools", "uvloop",
     "arabic_reshaper", "bidi", "bidi.algorithm",
     "app", "app.server", "app.services",
+    "app.services.translate",
     "app.services.ai_text", "app.services.ai_image",
     "app.services.ai_tts", "app.services.video_engine",
+    "PIL", "PIL.Image", "PIL.ImageDraw", "PIL.ImageFont",
+    "PIL.ImageFilter", "PIL.ImageEnhance",
 ]
 
 a = Analysis(

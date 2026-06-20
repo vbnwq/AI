@@ -32,6 +32,7 @@ VOICE_MAP = {
 }
 
 # Per-language male/female neural voices for explicit gender selection.
+# Persian (fa) has high-quality neural voices: Farid (male), Dilara (female).
 GENDER_VOICES = {
     "en": {"male": "en-US-GuyNeural", "female": "en-US-AriaNeural"},
     "fa": {"male": "fa-IR-FaridNeural", "female": "fa-IR-DilaraNeural"},
@@ -65,8 +66,10 @@ def pick_voice(language="en", voice=None, gender=None):
     return VOICE_MAP.get(language, "en-US-AriaNeural")
 
 
-async def _edge_save(text, voice, out_path, rate="+0%", pitch="+0Hz"):
-    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
+async def _edge_save(text, voice, out_path, rate="+0%", pitch="+0Hz",
+                     volume="+0%"):
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch,
+                                       volume=volume)
     await communicate.save(out_path)
 
 
@@ -131,10 +134,17 @@ def get_audio_duration(path):
 
 
 def synthesize(text, out_path, language="en", voice=None, rate="+0%",
-               pitch="+0Hz", gender=None):
+               pitch="+0Hz", gender=None, volume="+0%"):
     """
     Convert text to speech mp3 at out_path.
     Returns (out_path, duration_seconds).
+
+    Robust chain (all free):
+      1. Microsoft Edge neural TTS (best quality, native Persian voices) with
+         a couple of retries (handles transient network blips).
+      2. Edge TTS with the language's default voice (if a custom voice failed).
+      3. Google Translate TTS fallback.
+    Never raises on transient failure unless every backend fails.
     """
     text = (text or "").strip()
     if not text:
@@ -142,17 +152,28 @@ def synthesize(text, out_path, language="en", voice=None, rate="+0%",
 
     chosen_voice = pick_voice(language, voice, gender)
 
-    # Try edge-tts first
+    # Try edge-tts (best quality) with retries.
+    for attempt in range(3):
+        try:
+            asyncio.run(_edge_save(text, chosen_voice, out_path,
+                                   rate=rate, pitch=pitch, volume=volume))
+            if os.path.exists(out_path) and os.path.getsize(out_path) > 500:
+                return out_path, get_audio_duration(out_path)
+        except Exception:
+            pass
+        # second try: fall back to the language default voice
+        if attempt == 0:
+            chosen_voice = VOICE_MAP.get(language, "en-US-AriaNeural")
+
+    # Fallback to Google TTS (gTTS endpoint).
     try:
-        asyncio.run(_edge_save(text, chosen_voice, out_path, rate=rate, pitch=pitch))
+        _gtts_fallback(text, out_path, language=language)
         if os.path.exists(out_path) and os.path.getsize(out_path) > 500:
             return out_path, get_audio_duration(out_path)
     except Exception:
         pass
 
-    # Fallback to Google TTS
-    _gtts_fallback(text, out_path, language=language)
-    return out_path, get_audio_duration(out_path)
+    raise RuntimeError("All TTS backends failed for language=" + str(language))
 
 
 def list_voices_sync():
