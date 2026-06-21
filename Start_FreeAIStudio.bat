@@ -37,5 +37,5 @@ if not exist "ffmpeg\ffmpeg.exe" (
 )
 
 echo [*] Launching Free AI Studio...
-python launcher.py
+python run.py
 pause

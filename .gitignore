@@ -12,6 +12,7 @@ output/images/*
 output/videos/*
 output/temp/*
 output/*.log
+output/history.json
 !output/.gitkeep
 
 # Bundled ffmpeg (downloaded by build script)
@@ -20,3 +21,6 @@ ffmpeg/
 # OS
 .DS_Store
 Thumbs.db
+!output/images/.gitkeep
+!output/videos/.gitkeep
+!output/temp/.gitkeep

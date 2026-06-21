@@ -39,10 +39,11 @@ sys.path.insert(0, BASE)
 # Point the server's output dir to a writable location next to the exe
 os.environ.setdefault("AISTUDIO_HOME", APP_HOME)
 
-# Add bundled ffmpeg to PATH if present
-_bundled_ffmpeg = os.path.join(BASE, "ffmpeg")
-if os.path.isdir(_bundled_ffmpeg):
-    os.environ["PATH"] = _bundled_ffmpeg + os.pathsep + os.environ.get("PATH", "")
+# Add bundled/persistent ffmpeg dirs to PATH if present (one-time install is
+# saved next to the app home and reused forever on later runs).
+for _ff in (os.path.join(BASE, "ffmpeg"), os.path.join(APP_HOME, "ffmpeg")):
+    if os.path.isdir(_ff) and _ff not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = _ff + os.pathsep + os.environ.get("PATH", "")
 
 
 def find_free_port(preferred=8000):
