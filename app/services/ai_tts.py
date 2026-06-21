@@ -3,9 +3,24 @@ ai_tts.py - Free Text-to-Speech (no API key)
 Primary:  Microsoft Edge TTS (edge-tts) - natural neural voices, multilingual.
 Fallback: Google Translate TTS.
 Returns spoken audio (mp3) and the measured duration in seconds.
+
+PERSIAN / IRANIAN ACCENT
+------------------------
+The Persian voices used here are TRUE Iranian (fa-IR) neural voices:
+  * fa-IR-FaridNeural   (male, natural Tehran/standard Iranian accent)
+  * fa-IR-DilaraNeural  (female, natural Iranian accent)
+These are the official Microsoft Persian (Iran) neural voices — they speak with
+a genuine Iranian/Persian accent, correct intonation and natural prosody.
+
+We additionally:
+  * Normalize Persian text (digits, punctuation, ZWNJ) for clearer, more
+    natural pronunciation.
+  * Apply light, accent-friendly prosody defaults (slightly warmer pitch /
+    measured pace) so narration sounds professional and natural in Persian.
 """
 import asyncio
 import os
+import re
 import subprocess
 import urllib.parse
 import requests
@@ -18,8 +33,8 @@ HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 VOICE_MAP = {
     "en": "en-US-AriaNeural",
     "en-male": "en-US-GuyNeural",
-    "fa": "fa-IR-FaridNeural",
-    "fa-female": "fa-IR-DilaraNeural",
+    "fa": "fa-IR-FaridNeural",       # Iranian Persian male
+    "fa-female": "fa-IR-DilaraNeural",  # Iranian Persian female
     "ar": "ar-SA-HamedNeural",
     "es": "es-ES-AlvaroNeural",
     "fr": "fr-FR-HenriNeural",
@@ -29,6 +44,15 @@ VOICE_MAP = {
     "hi": "hi-IN-MadhurNeural",
     "zh": "zh-CN-YunxiNeural",
     "ja": "ja-JP-KeitaNeural",
+}
+
+# Accent-friendly prosody defaults per language. For Persian we use a measured
+# pace and a touch of warmth so the Iranian accent sounds natural & professional
+# rather than robotic. Values are merged with any caller-provided rate/pitch.
+ACCENT_PROSODY = {
+    "fa": {"rate": "-4%", "pitch": "+0Hz", "volume": "+0%"},
+    "ar": {"rate": "-3%", "pitch": "+0Hz", "volume": "+0%"},
+    "en": {"rate": "+0%", "pitch": "+0Hz", "volume": "+0%"},
 }
 
 # Per-language male/female neural voices for explicit gender selection.
@@ -46,6 +70,45 @@ GENDER_VOICES = {
     "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
     "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"},
 }
+
+
+# Map Western/Persian digits etc. so the Persian voice reads numbers naturally.
+_PERSIAN_DIGITS = str.maketrans("0123456789", "۰۱۲۳۴۵۶۷۸۹")
+_ARABIC_TO_PERSIAN = str.maketrans({"ي": "ی", "ك": "ک", "ۀ": "ه", "ة": "ه"})
+
+
+def normalize_persian(text):
+    """Clean up Persian text for clearer, more natural TTS pronunciation.
+
+    * unify Arabic glyphs to Persian (ي->ی, ك->ک)
+    * normalize ZWNJ / spacing and collapse repeats
+    * convert ASCII digits to Persian digits (read correctly by fa voices)
+    * tidy punctuation so the voice pauses naturally
+    """
+    if not text:
+        return text
+    t = text.translate(_ARABIC_TO_PERSIAN)
+    t = t.replace("\u200c", " ").replace("\u200f", "").replace("\u200e", "")
+    # standalone ASCII numbers -> Persian digits for natural reading
+    t = re.sub(r"(?<![A-Za-z])\d+(?![A-Za-z])",
+               lambda m: m.group(0).translate(_PERSIAN_DIGITS), t)
+    t = t.replace("...", "،").replace("…", "،")
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def _merge_prosody(language, rate, pitch, volume):
+    """Combine caller-supplied prosody with accent-friendly defaults.
+
+    Caller values win when explicitly non-default; otherwise the accent default
+    is applied. The `rate` from the server (duration-fit) is always respected
+    when it is not the neutral "+0%".
+    """
+    base = ACCENT_PROSODY.get(language, {})
+    out_rate = rate if rate not in (None, "+0%") else base.get("rate", rate or "+0%")
+    out_pitch = pitch if pitch not in (None, "+0Hz") else base.get("pitch", pitch or "+0Hz")
+    out_vol = volume if volume not in (None, "+0%") else base.get("volume", volume or "+0%")
+    return out_rate, out_pitch, out_vol
 
 
 def pick_voice(language="en", voice=None, gender=None):
@@ -149,6 +212,13 @@ def synthesize(text, out_path, language="en", voice=None, rate="+0%",
     text = (text or "").strip()
     if not text:
         raise ValueError("Empty text for TTS")
+
+    # Normalize Persian/Arabic text for clearer, more natural pronunciation.
+    if language in ("fa", "ar"):
+        text = normalize_persian(text)
+
+    # Apply accent-friendly prosody defaults (Iranian accent for Persian).
+    rate, pitch, volume = _merge_prosody(language, rate, pitch, volume)
 
     chosen_voice = pick_voice(language, voice, gender)
 

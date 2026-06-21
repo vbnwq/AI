@@ -76,14 +76,24 @@
   .pct{float:left;font-weight:800;color:var(--accent2)}
 
   .results{margin-top:22px}
-  .imgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-  .imgcell{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
-  .imgcell img{width:100%;display:block;cursor:zoom-in;transition:.2s}
+  /* Fixed, UI-friendly preview grid — aspect ratio preserved, never stretched */
+  .imgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}
+  .imgcell{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);
+    background:#0a1020}
+  /* contain keeps the image's real aspect ratio inside a fixed box (no distortion) */
+  .imgcell img{width:100%;height:200px;object-fit:contain;display:block;cursor:zoom-in;
+    transition:.2s;background:#0a1020}
   .imgcell:hover img{filter:brightness(1.05)}
   .imgcell .dlmini{position:absolute;bottom:8px;left:8px;background:rgba(8,12,26,.85);
     color:#fff;border:none;border-radius:9px;padding:7px 11px;font-size:12.5px;font-weight:700;
     cursor:pointer;font-family:inherit;backdrop-filter:blur(4px)}
-  video{width:100%;border-radius:16px;border:1px solid var(--border);background:#000;margin-top:6px;cursor:zoom-in}
+  .imgcell .zoomhint{position:absolute;top:8px;right:8px;background:rgba(8,12,26,.8);
+    color:#fff;border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:700;
+    pointer-events:none;backdrop-filter:blur(4px)}
+  /* Video preview constrained to a friendly size so it never breaks the layout */
+  .media-preview{display:flex;justify-content:center;background:#000;border-radius:16px;
+    border:1px solid var(--border);margin-top:6px;overflow:hidden}
+  video{width:100%;max-height:48vh;display:block;background:#000;cursor:zoom-in;object-fit:contain}
   .dlrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
   .dl{display:inline-flex;align-items:center;gap:6px;padding:11px 20px;border-radius:11px;
     background:linear-gradient(135deg,var(--ok),#27ae60);color:#fff;text-decoration:none;
@@ -197,6 +207,15 @@
       <div class="chip" data-val="high">💎 حداکثر کیفیت</div>
     </div>
 
+    <label>قالب طراحی ویدیو (چیدمان حرفه‌ای اسلایدها)</label>
+    <div class="opts" id="v-template">
+      <div class="chip active" data-val="auto">🎨 خودکار (ترکیب قالب‌ها)</div>
+      <div class="chip" data-val="midnight">🌌 سینمایی</div>
+      <div class="chip" data-val="aurora">💜 کارت بنفش</div>
+      <div class="chip" data-val="ocean">🌊 کارت اقیانوسی</div>
+      <div class="chip" data-val="sunset">🌅 ستونی (تصویر+متن)</div>
+    </div>
+
     <button class="btn" id="v-btn">🚀 ساختن ویدیو</button>
 
     <div class="progress" id="v-prog">
@@ -212,7 +231,7 @@
   <div id="tab-image" class="card" style="display:none">
     <label>توضیح عکس — چی می‌خوای ساخته بشه؟ (به فارسی) 👇</label>
     <textarea id="i-prompt" placeholder="مثال: یک شهر آینده‌نگرانه با ماشین‌های پرنده و نورهای نئونی در شب، سینمایی و باکیفیت"></textarea>
-    <div class="hint">متن فارسی به‌صورت خودکار به انگلیسی ترجمه و برای مدل تصویر بهینه می‌شود تا بهترین نتیجه را بگیرید.</div>
+    <div class="hint">متن فارسی خودکار به انگلیسی ترجمه و بهینه می‌شود. خط لوله‌ی چند‌هوش‌مصنوعی (ساخت → تقویت کیفیت → اصلاح آناتومی → کنترل کیفیت) برای چهره، دست‌ها و تناسب بدنِ درست به‌کار می‌رود. ✦ نسبت ابعاد حفظ می‌شود و تصویر کشیده/خراب نمی‌شود.</div>
 
     <div class="row">
       <div>
@@ -275,7 +294,7 @@
   </div>
 
   <footer>
-    موتورهای رایگان: Pollinations Flux (تصویر) · موتور سناریوی فارسی · Edge Neural TTS فارسی · FFmpeg + PIL (ویدیو و زیرنویس RTL)<br>
+    خط لوله‌ی چند‌هوش‌مصنوعی رایگان: پژوهش + راستی‌آزمایی + نگارش سناریو · عکس‌ساز چندمرحله‌ای (Flux + اصلاح آناتومی) · صدای فارسیِ ایرانی (Edge Neural TTS) · قالب‌های حرفه‌ای ویدیو (FFmpeg + PIL، راست‌چین)<br>
     بدون نیاز به API Key — کاملاً رایگان · بهینه برای سیستم‌های بدون کارت گرافیک ✦
   </footer>
 </div>
@@ -309,7 +328,7 @@ function chipGroup(sel){
     c.classList.add('active');
   });
 }
-chipGroup('#v-res'); chipGroup('#v-quality');
+chipGroup('#v-res'); chipGroup('#v-quality'); chipGroup('#v-template');
 function getChip(sel){ const a=$(sel+' .chip.active'); return a?a.dataset.val:null; }
 
 // Health check
@@ -367,6 +386,7 @@ $('#v-btn').onclick = async () => {
     duration: parseInt($('#v-duration').value),
     resolution: getChip('#v-res'),
     quality: getChip('#v-quality'),
+    template: getChip('#v-template') || 'auto',
     language: $('#v-lang').value,
     gender: $('#v-gender').value,
   };
@@ -392,10 +412,10 @@ $('#v-btn').onclick = async () => {
         }
         $('#v-results').innerHTML =
           '<h3 style="margin-bottom:10px">✅ '+(res.title||'ویدیوی شما آماده شد')+'</h3>'+
-          '<video src="'+res.url+'" controls onclick="event.preventDefault();openLightbox(\'video\',\''+res.url+'\')"></video>'+
+          '<div class="media-preview"><video src="'+res.url+'" controls playsinline></video></div>'+
           '<div class="dlrow">'+
-            '<a class="dl" href="'+dlLink(res.url)+'">⬇️ دانلود ویدیو</a>'+
-            '<button class="dl alt" onclick="openLightbox(\'video\',\''+res.url+'\')">🔍 نمایش تمام‌صفحه</button>'+
+            '<a class="dl" href="'+dlLink(res.url)+'">⬇️ دانلود ویدیوی اصلی</a>'+
+            '<button class="dl alt" onclick="openLightbox(\'video\',\''+res.url+'\')">🔍 نمایش بزرگ / تمام‌صفحه</button>'+
           '</div>'+ scenesHtml;
       }
       if(j.status==='error'){
@@ -431,8 +451,9 @@ $('#i-btn').onclick = async () => {
       if(j.results && j.results.length){
         $('#i-results').innerHTML = j.results.map(im =>
           '<div class="imgcell">'+
+            '<span class="zoomhint">🔍 کلیک = بزرگ‌نمایی</span>'+
             '<img src="'+im.url+'" loading="lazy" onclick="openLightbox(\'image\',\''+im.url+'\')">'+
-            '<button class="dlmini" onclick="location.href=\''+dlLink(im.url)+'\'">⬇️ دانلود</button>'+
+            '<button class="dlmini" onclick="location.href=\''+dlLink(im.url)+'\'">⬇️ دانلود اصلی</button>'+
           '</div>').join('');
       }
       if(j.status==='done'){ $('#i-btn').disabled=false; }

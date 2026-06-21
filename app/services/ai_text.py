@@ -80,6 +80,66 @@ def generate_text(prompt, system=None, temperature=0.7):
     return f"{prompt}\n\n(Generated offline.)"
 
 
+# ==================================================================
+#  MULTI-AI SUPERVISOR — Research / Fact-Check / Content agents
+# ==================================================================
+# These free agents collaborate BEFORE the script is written so the final
+# narration is grounded in real, verified information about the topic instead
+# of repetitive filler. All use the same free Pollinations LLM (no API key).
+
+def research_topic(topic, language_name="Persian (Farsi)"):
+    """AI Agent: Deep Research — gather real, structured facts about the topic.
+
+    Returns a list of concise factual bullet points (strings) in the target
+    language, or [] if the research agent is unavailable.
+    """
+    system = ("You are a meticulous research assistant. Gather accurate, "
+              "concrete, non-repetitive facts. Output ONLY a JSON array of "
+              "short factual strings. No commentary, no markdown.")
+    prompt = (f"Research the topic: \"{topic}\".\n"
+              f"Return 8-12 DISTINCT, specific, factual key points about it "
+              f"(definitions, how it works, history, pros/cons, real examples, "
+              f"common misconceptions, practical tips). Each point must be "
+              f"different from the others. Write each point in {language_name}.\n"
+              f"Output ONLY a JSON array of strings.")
+    raw = _online_llm([{"role": "system", "content": system},
+                       {"role": "user", "content": prompt}],
+                      temperature=0.6, timeout=90)
+    facts = _extract_json_array(raw)
+    # de-duplicate & clean
+    seen, out = set(), []
+    for f in facts or []:
+        s = str(f).strip(" -•\t").strip()
+        key = s.lower()[:40]
+        if s and key not in seen and len(s) > 8:
+            seen.add(key)
+            out.append(s)
+    return out
+
+
+def fact_check(facts, topic, language_name="Persian (Farsi)"):
+    """AI Agent: Fact-Check — filter/correct the researched facts.
+
+    Returns a cleaned list. If the agent is unavailable, returns input as-is.
+    """
+    if not facts:
+        return facts
+    system = ("You are a strict fact-checker. Remove false, vague, duplicated "
+              "or off-topic statements and lightly correct wording. Output ONLY "
+              "a JSON array of the verified statements, no commentary.")
+    prompt = (f"Topic: \"{topic}\".\nVerify and clean these statements, keep "
+              f"only accurate, distinct, on-topic ones, written in "
+              f"{language_name}:\n{json.dumps(facts, ensure_ascii=False)}\n"
+              f"Output ONLY a JSON array of strings.")
+    raw = _online_llm([{"role": "system", "content": system},
+                       {"role": "user", "content": prompt}],
+                      temperature=0.2, timeout=80)
+    checked = _extract_json_array(raw)
+    if checked and len(checked) >= max(3, len(facts) // 2):
+        return [str(c).strip() for c in checked if str(c).strip()]
+    return facts
+
+
 # ------------------------------------------------------------ video scripts
 LANG_NAMES = {
     "en": "English", "fa": "Persian (Farsi)", "ar": "Arabic", "es": "Spanish",
@@ -88,51 +148,92 @@ LANG_NAMES = {
 }
 
 
-def generate_video_script(topic, duration_sec, language="en", num_scenes=None):
+def generate_video_script(topic, duration_sec, language="en", num_scenes=None,
+                          progress_cb=None):
     """
     Returns dict: {title, scenes:[{narration, image_prompt, caption}]}.
-    Tries the online LLM first; otherwise builds a real structured script.
-    Guarantees: narration/caption in `language`, image_prompt in English.
+
+    MULTI-AI SUPERVISOR pipeline (all free, no key):
+      1. Research Agent     -> gather real facts about the topic.
+      2. Fact-Check Agent   -> verify & clean those facts.
+      3. Scriptwriter Agent -> write a structured multi-scene script grounded in
+                               the verified facts (intro -> pre-intro -> body
+                               steps -> conclusion).
+      4. Built-in fallback  -> if any agent is unavailable, a strong offline
+                               writer guarantees a real, multi-scene script.
+
+    GUARANTEES:
+      * MULTIPLE scenes (never a single repeated slide).
+      * Every scene's narration is UNIQUE (no '1 2 3 4 5 6' duplication bug).
+      * narration/caption in `language`, image_prompt in English.
     """
     if num_scenes is None:
-        num_scenes = max(4, min(20, round(duration_sec / 6)))
+        num_scenes = max(5, min(16, round(duration_sec / 7) + 2))
     lang_name = LANG_NAMES.get(language, "English")
 
-    # 1) try online LLM for top quality
-    data = _online_script(topic, duration_sec, num_scenes, lang_name)
+    def _say(msg):
+        if progress_cb:
+            try:
+                progress_cb(msg)
+            except Exception:
+                pass
 
-    # 2) fall back to built-in scriptwriter
+    # 1) Research + 2) Fact-check (collaborative grounding)
+    _say("پژوهش درباره موضوع با هوش مصنوعی…")
+    facts = research_topic(topic, lang_name)
+    if facts:
+        _say("راستی‌آزمایی اطلاعات…")
+        facts = fact_check(facts, topic, lang_name)
+
+    # 3) Scriptwriter agent (grounded in facts)
+    _say("نوشتن سناریوی چندصحنه‌ای…")
+    data = _online_script(topic, duration_sec, num_scenes, lang_name, facts)
+
+    # 4) fall back to built-in scriptwriter (still multi-scene & grounded)
     if not _valid_script(data):
-        data = build_offline_script(topic, duration_sec, num_scenes, language)
+        data = build_offline_script(topic, duration_sec, num_scenes, language,
+                                    facts=facts)
 
-    return _normalize_script(data, topic, language)
+    return _normalize_script(data, topic, language, min_scenes=4)
 
 
-def _online_script(topic, duration_sec, num_scenes, lang_name):
+def _online_script(topic, duration_sec, num_scenes, lang_name, facts=None):
     system = (
         "You are an expert educational video scriptwriter and visual director. "
-        "Respond with ONLY valid JSON. No markdown, no commentary."
+        "You write engaging, well-structured, NON-REPETITIVE scripts where every "
+        "scene teaches something different. Respond with ONLY valid JSON. "
+        "No markdown, no commentary."
     )
     total_words = int(duration_sec * 2.4)
-    wps = max(10, total_words // num_scenes)
+    wps = max(12, total_words // num_scenes)
+    facts_block = ""
+    if facts:
+        facts_block = ("\nUse these verified facts as the factual backbone "
+                       "(rephrase naturally, do not list them verbatim):\n- "
+                       + "\n- ".join(facts[:12]) + "\n")
     prompt = f"""Create a {duration_sec}-second educational explainer video script about:
 "{topic}"
-
+{facts_block}
 Strict rules:
 - Narration language: {lang_name}. Write natural, fluent, native {lang_name}.
-- Exactly {num_scenes} scenes.
-- Each "narration" ~{wps} words; factual, clear, engaging, teaching thoroughly.
+- Exactly {num_scenes} scenes. Follow this LOGICAL STRUCTURE:
+  1) Hook / introduction, 2) brief pre-introduction / context,
+  3..N-1) main content as clear step-by-step points (each a DIFFERENT idea),
+  N) conclusion / takeaway.
+- Every "narration" MUST be COMPLETELY DIFFERENT from the others (no repetition,
+  no numbering like "1 2 3", no filler). ~{wps} words each; factual & engaging.
 - "image_prompt" MUST be IN ENGLISH: a detailed cinematic illustration prompt
-  (subject, setting, style, lighting, composition, mood) describing the scene
-  visually. Keep a consistent modern, high-quality cinematic style across scenes.
-- "caption": a short on-screen title (<=7 words) in {lang_name}.
+  (subject, setting, style, lighting, composition, mood) that VISUALLY matches
+  that specific scene's content. Keep a consistent modern cinematic style and
+  show step-by-step visual progression across scenes.
+- "caption": a short on-screen title (<=7 words) in {lang_name}, unique per scene.
 
 Output ONLY this JSON:
 {{"title":"...","scenes":[{{"narration":"...","image_prompt":"...","caption":"..."}}]}}"""
     raw = _online_llm(
         [{"role": "system", "content": system},
          {"role": "user", "content": prompt}],
-        temperature=0.8, timeout=95)
+        temperature=0.85, timeout=110)
     return _extract_json(raw) if raw else None
 
 
@@ -152,11 +253,16 @@ _FA = {
 }
 
 
-def build_offline_script(topic, duration_sec, num_scenes, language="en"):
+def build_offline_script(topic, duration_sec, num_scenes, language="en",
+                         facts=None):
     """
     Build a genuine, structured educational script without any external API.
     Persian (fa) gets a native Persian writer; other languages use English
     text that is later translated to the target language during normalization.
+
+    If `facts` (from the research/fact-check agents) are available, they are
+    woven into the body scenes so even the offline path is grounded in real,
+    UNIQUE content rather than repetitive filler.
     """
     topic_clean = topic.strip()
     style = ("cinematic, highly detailed, professional lighting, modern 4k "
@@ -165,6 +271,11 @@ def build_offline_script(topic, duration_sec, num_scenes, language="en"):
     is_fa = (language == "fa")
     # English topic used for IMAGE PROMPTS (always English).
     topic_en = translate.to_english(topic_clean) if is_fa else topic_clean
+
+    # If we have grounded facts, build a fact-driven structured script.
+    if facts and len(facts) >= 3:
+        return _facts_script(topic_clean, topic_en, facts, num_scenes,
+                             is_fa, style)
 
     comp = _detect_comparison(topic_clean if not is_fa else topic_en)
     scenes = []
@@ -231,6 +342,61 @@ def build_offline_script(topic, duration_sec, num_scenes, language="en"):
                              f"{style}",
                              ("ممنون که دیدید" if is_fa else "Thanks for watching")))
 
+    return {"title": title, "scenes": scenes}
+
+
+def _facts_script(topic_clean, topic_en, facts, num_scenes, is_fa, style):
+    """Build a structured, UNIQUE, multi-scene script from researched facts.
+
+    Structure: intro -> pre-intro/context -> one scene per fact -> conclusion.
+    Each body scene narrates a DIFFERENT fact, guaranteeing no repetition.
+    """
+    title = topic_clean
+    scenes = []
+
+    # 1) Intro / hook
+    if is_fa:
+        intro = (f"{_FA['welcome']} {_FA['about']} {topic_clean}. "
+                 f"{_FA['intro_tail']}")
+        pre = ("ابتدا یک نگاه کلی به موضوع می‌اندازیم تا با مفاهیم پایه آشنا شویم، "
+               "سپس نکات مهم را قدم‌به‌قدم بررسی می‌کنیم.")
+    else:
+        intro = (f"Welcome to this explainer about {topic_clean}. "
+                 f"Let us break it down step by step.")
+        pre = ("First, a quick overview to set the context, then we will go "
+               "through the key points one by one.")
+    scenes.append(_scene(intro,
+                         f"an engaging hero illustration representing {topic_en}, "
+                         f"{style}", _short(topic_clean)))
+    scenes.append(_scene(pre,
+                         f"clean overview infographic concept about {topic_en}, "
+                         f"{style}",
+                         ("مقدمه" if is_fa else "Overview")))
+
+    # 2) Body — one unique scene per fact (capped to fit num_scenes)
+    body_slots = max(1, num_scenes - 3)
+    chosen = facts[:body_slots]
+    for idx, fact in enumerate(chosen, start=1):
+        fact = str(fact).strip()
+        if is_fa:
+            cap = f"نکته {idx}"
+        else:
+            cap = f"Point {idx}"
+        img = (f"detailed cinematic visual illustrating: {topic_en}, "
+               f"aspect {idx}, infographic feel, {style}")
+        scenes.append(_scene(fact, img, cap))
+
+    # 3) Conclusion
+    if is_fa:
+        concl = (f"{_FA['summary']} این‌ها مهم‌ترین نکات درباره‌ی {topic_clean} بودند. "
+                 f"{_FA['thanks']}")
+    else:
+        concl = (f"In summary, these were the most important points about "
+                 f"{topic_clean}. Thanks for watching, and keep exploring!")
+    scenes.append(_scene(concl,
+                         f"inspiring closing scene about {topic_en}, sunrise, "
+                         f"{style}",
+                         ("جمع‌بندی" if is_fa else "Conclusion")))
     return {"title": title, "scenes": scenes}
 
 
@@ -377,28 +543,84 @@ def _valid_script(data):
                 and data.get("scenes") and len(data["scenes"]) >= 1)
 
 
-def _normalize_script(data, topic, language="en"):
-    """Clean scenes & GUARANTEE image_prompt is English."""
+def _normalize_script(data, topic, language="en", min_scenes=4):
+    """Clean scenes, DEDUPLICATE narration, and GUARANTEE a valid multi-scene
+    script with English image prompts.
+
+    This is the safety net that prevents the "single repeated slide" bug:
+      * scenes with empty or duplicate narration are dropped,
+      * if too few unique scenes remain, we rebuild with the offline writer.
+    """
     data.setdefault("title", topic)
     clean = []
+    seen_nar = set()
+    seen_cap = set()
     for s in data.get("scenes", []):
         if not isinstance(s, dict):
             continue
         nar = str(s.get("narration", "")).strip()
         if not nar:
             continue
+        # Drop pure-numeric / trivial narration (the old "1 2 3" bug).
+        if re.fullmatch(r"[\d\s.,،\-]+", nar):
+            continue
+        # Deduplicate by a normalized narration key.
+        key = re.sub(r"\s+", " ", nar.lower())[:80]
+        if key in seen_nar:
+            continue
+        seen_nar.add(key)
+
         img = str(s.get("image_prompt") or nar).strip()
-        # Ensure the image prompt is English for best image-model results.
         if translate.has_persian(img):
             img = translate.to_english(img)
         cap = str(s.get("caption") or "").strip()[:60]
+        # Ensure captions are not identical across scenes.
+        cap_key = cap.lower()
+        if cap and cap_key in seen_cap:
+            cap = ""
+        if cap:
+            seen_cap.add(cap_key)
         clean.append({"narration": nar, "image_prompt": img or topic,
                       "caption": cap})
-    if not clean:
-        data = build_offline_script(topic, 60, 6, language)
-        clean = data["scenes"]
+
+    # If we ended up with too few UNIQUE scenes, rebuild a real script.
+    if len(clean) < min_scenes:
+        rebuilt = build_offline_script(topic, 75, max(min_scenes + 2, 6),
+                                       language)
+        # merge any good unique scenes we already had with the rebuilt ones
+        merged = clean[:]
+        for s in rebuilt["scenes"]:
+            k = re.sub(r"\s+", " ", s["narration"].lower())[:80]
+            if k not in seen_nar:
+                seen_nar.add(k)
+                merged.append(s)
+        clean = merged
+
     data["scenes"] = clean
     return data
+
+
+def _extract_json_array(text):
+    """Extract a JSON array of strings from possibly-noisy LLM output."""
+    if not text:
+        return None
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```[a-zA-Z]*", "", text).strip("`").strip()
+    s, e = text.find("["), text.rfind("]")
+    if s == -1 or e == -1 or e <= s:
+        return None
+    snippet = text[s:e + 1]
+    try:
+        arr = json.loads(snippet)
+    except Exception:
+        try:
+            arr = json.loads(re.sub(r",\s*([}\]])", r"\1", snippet))
+        except Exception:
+            return None
+    if isinstance(arr, list):
+        return [x for x in arr if isinstance(x, (str, int, float))]
+    return None
 
 
 def _extract_json(text):

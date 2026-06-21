@@ -138,6 +138,7 @@ class VideoReq(BaseModel):
     gender: str | None = None
     image_model: str = "flux"
     quality: str = "balanced"
+    template: str = "auto"
 
 
 # ---------- Job helpers ----------
@@ -186,14 +187,16 @@ def health():
     return {
         "status": "ok",
         "sources": {
-            "image": "Pollinations Flux (free, no key) + sharpening",
+            "image": "Multi-AI image pipeline (Flux + enhance + anatomy + QA)",
+            "research": "Free Deep-Research + Fact-Check AI agents (Persian)",
             "text": "Pollinations LLM (free) + built-in Persian writer",
             "translate": "Free fa->en translation layer (Google + LLM + offline)",
-            "tts": "Microsoft Edge Neural TTS (Persian) + Google TTS fallback",
-            "video": "FFmpeg + PIL RTL overlays (local, free)",
+            "tts": "Microsoft Edge Iranian Persian Neural TTS + Google fallback",
+            "video": "Multi-AI supervisor + professional templates (FFmpeg+PIL)",
         },
         "resolutions": list(video_engine.RESOLUTIONS.keys()),
         "qualities": list(video_engine.QUALITY_PRESETS.keys()),
+        "templates": ["auto"] + list(video_engine.TEMPLATES.keys()),
     }
 
 
@@ -247,10 +250,16 @@ def gen_image(req: ImageReq):
 def _run_video_job(jid, req: VideoReq):
     try:
         update_job(jid, status="running", stage="script",
-                   message="نوشتن سناریو با هوش مصنوعی…", progress=3)
+                   message="تیم هوش مصنوعی در حال پژوهش و نگارش سناریو…",
+                   progress=3)
+
+        # Multi-AI supervisor: research -> fact-check -> scriptwriting.
+        def script_progress(msg):
+            update_job(jid, stage="script", message=msg, progress=5)
 
         script = ai_text.generate_video_script(
-            req.topic, req.duration, language=req.language)
+            req.topic, req.duration, language=req.language,
+            progress_cb=script_progress)
         n = len(script["scenes"])
         update_job(jid, message=f"سناریو آماده شد: {n} صحنه", progress=8,
                    results=[{"title": script.get("title", req.topic), "scenes": n}])
@@ -290,7 +299,8 @@ def _run_video_job(jid, req: VideoReq):
             script, resolution=req.resolution, language=req.language,
             voice=req.voice, workdir=workdir, out_path=out_path,
             progress_cb=progress_cb, image_model=req.image_model,
-            tts_rate=rate, gender=req.gender, quality=req.quality)
+            tts_rate=rate, gender=req.gender, quality=req.quality,
+            template=req.template)
 
         result = {
             "title": script.get("title", req.topic),
