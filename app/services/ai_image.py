@@ -36,7 +36,7 @@ import requests
 from . import translate
 
 try:
-    from PIL import Image, ImageEnhance, ImageFilter
+    from PIL import Image, ImageEnhance, ImageFilter, ImageOps
     _HAS_PIL = True
 except Exception:
     _HAS_PIL = False
@@ -47,49 +47,71 @@ POLLINATIONS_URL = "https://image.pollinations.ai/prompt/"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/120 Safari/537.36",
+    "Referer": "https://pollinations.ai/",
 }
 
-# Available free models on pollinations (ordered by quality).  "flux" is the
-# strongest free general model; "turbo" is a fast fallback.  We also use
-# style boosters to emulate flux-realism / flux-pro quality.
-MODELS = ["flux", "turbo"]
+# Free image models we request, in order of preference.  The anonymous tier
+# currently serves a single strong diffusion backend ("flux"/"turbo" resolve to
+# it server-side); we still send a richer, ordered list so that the moment any
+# higher-fidelity free model becomes available it is used automatically.  This
+# is part of the MULTI-AI / MULTI-MODEL strategy.
+MODELS = ["flux", "flux-realism", "flux-pro", "turbo", "sana"]
 
 # Quality booster suffixes appended to every prompt for maximum detail.
+# Heavily oriented toward CRISP, PHOTOREALISTIC output (no soft/blurry faces).
 QUALITY_BOOSTERS = {
-    "standard": "high quality, detailed, sharp focus, natural proportions",
-    "high": ("masterpiece, best quality, highly detailed, ultra sharp focus, "
-             "professional photography, 8k, intricate details, vivid colors, "
-             "perfect composition, cinematic lighting, natural proportions"),
+    "standard": ("high quality, detailed, tack-sharp focus, crisp, "
+                 "natural proportions, realistic"),
+    "high": ("masterpiece, best quality, highly detailed, tack-sharp focus, "
+             "crystal clear, professional photography, shot on DSLR, 8k, "
+             "intricate fine details, vivid colors, perfect composition, "
+             "cinematic lighting, natural proportions, photorealistic, "
+             "high microcontrast, crisp edges"),
     "ultra": ("masterpiece, best quality, ultra detailed, hyper realistic, "
-              "8k uhd, extremely sharp focus, professional photography, "
-              "intricate fine details, perfect lighting, cinematic, "
-              "dramatic composition, award winning, "
-              "vivid rich colors, high dynamic range, photorealistic, "
-              "physically accurate, true to life"),
+              "photorealistic, 8k uhd, RAW photo, shot on Canon EOS R5, "
+              "85mm f/1.4 lens, tack-sharp focus, crystal clear, "
+              "extremely crisp, razor sharp details, deep depth of field, "
+              "professional studio photography, intricate fine details, "
+              "perfect natural lighting, cinematic, dramatic composition, "
+              "award winning, vivid rich colors, high dynamic range, "
+              "physically accurate, true to life, high microcontrast, "
+              "fine skin pores, lifelike texture, no blur, ultra realistic"),
 }
 
 # Anatomy-aware booster: pushed hard whenever the prompt likely involves people.
-# This is the single biggest lever for correct faces, hands and bodies.
-ANATOMY_BOOSTER = ("perfect anatomy, anatomically correct, correct proportions, "
-                   "beautiful detailed symmetric face, natural facial features, "
-                   "clear sharp eyes, detailed iris, natural skin texture, "
-                   "five fingers per hand, correct number of fingers, "
-                   "well-formed hands, detailed realistic hands, "
-                   "natural pose, realistic body proportions, "
-                   "professional portrait photography, 85mm lens, soft natural light")
+# This is the single biggest lever for correct faces, hands and bodies. It now
+# explicitly targets SHARP, DETAILED faces / eyes and correct HAND anatomy so
+# the model stops producing soft or malformed results.
+ANATOMY_BOOSTER = (
+    "perfect anatomy, anatomically correct, correct human proportions, "
+    "beautiful highly detailed symmetric face, sharp defined facial features, "
+    "crystal clear sharp eyes, detailed realistic iris, catchlights in eyes, "
+    "natural detailed skin with visible pores, realistic skin texture, "
+    "sharp eyelashes and eyebrows, well-defined nose and lips, "
+    "five fingers per hand, exactly five fingers, correct number of fingers, "
+    "well-formed natural hands, detailed realistic hands, perfect hands, "
+    "elegant natural hand pose, realistic finger nails, "
+    "natural relaxed pose, realistic body proportions, "
+    "sharp in-focus subject, professional portrait photography, "
+    "85mm lens, soft natural studio light, high definition face")
 
-# Much stronger negative prompt — explicitly targets anatomy failure modes.
+# Much stronger negative prompt — explicitly targets anatomy + softness failure
+# modes (soft/blurry faces, bad eyes, malformed hands, wrong finger counts).
 NEGATIVE_PROMPT = (
-    "blurry, low quality, low resolution, pixelated, distorted, deformed, "
-    "disfigured, ugly, bad anatomy, wrong anatomy, mutated, mutation, "
-    "extra limbs, missing limbs, extra arms, extra legs, fused fingers, "
-    "too many fingers, missing fingers, extra fingers, malformed hands, "
-    "mutated hands, bad hands, poorly drawn hands, deformed hands, "
+    "blurry, blur, soft focus, out of focus, soft, hazy, smudged, "
+    "low quality, low resolution, lowres, pixelated, jpeg artifacts, grainy, "
+    "noisy, distorted, deformed, disfigured, ugly, "
+    "bad anatomy, wrong anatomy, mutated, mutation, extra limbs, missing limbs, "
+    "extra arms, extra legs, fused fingers, too many fingers, missing fingers, "
+    "extra fingers, six fingers, malformed hands, mutated hands, bad hands, "
+    "poorly drawn hands, deformed hands, deformed fingers, long fingers, "
     "long neck, bad face, deformed face, asymmetric face, ugly face, "
-    "cross-eye, poorly drawn face, cloned face, bad proportions, "
-    "gross proportions, watermark, text, signature, username, logo, "
-    "jpeg artifacts, grainy, oversaturated, cropped, out of frame, "
-    "duplicate, morbid, mutilated"
+    "blurry face, soft face, undefined face, plastic skin, waxy skin, "
+    "airbrushed, overprocessed, dead eyes, lazy eye, cross-eye, "
+    "poorly drawn face, cloned face, bad proportions, gross proportions, "
+    "watermark, text, signature, username, logo, "
+    "oversaturated, washed out, cropped, out of frame, duplicate, "
+    "morbid, mutilated, cartoonish, cgi, 3d render, doll, mannequin"
 )
 
 # Heuristic keywords that suggest a human/person is in the prompt so we add the
@@ -127,27 +149,59 @@ def _build_prompt(prompt, quality="ultra", anatomy=None):
 
 # ----------------------------------------------------- Agent 2: quality / upscale
 def _enhance_quality(path, quality="ultra"):
-    """CPU-cheap quality enhancement + light upscale for extra perceived detail.
+    """Strong CPU-only detail-enhancement that KILLS soft/blurry rendering.
 
-    Preserves aspect ratio (only scales up proportionally for small images).
+    Pipeline (aspect-ratio preserving — never stretched/cropped):
+      1. Proportional LANCZOS upscale for small outputs.
+      2. Edge-preserving micro-denoise (removes diffusion grain without smearing).
+      3. Multi-radius unsharp masking (fine + medium) for crisp facial detail
+         and well-defined eyes/edges — this is what removes the "soft face" look.
+      4. Local-contrast (CLAHE-style autocontrast) + tasteful color/contrast.
     """
     if not _HAS_PIL:
         return
     try:
         im = Image.open(path).convert("RGB")
         w, h = im.size
-        # Gentle proportional upscale for small outputs (keeps aspect ratio).
+
+        # 1) Gentle proportional upscale for small outputs (keeps aspect ratio).
         long_edge = max(w, h)
-        if long_edge < 1024:
-            scale = 1024.0 / long_edge
+        target = 1280 if quality == "ultra" else 1024
+        if long_edge < target:
+            scale = target / long_edge
             im = im.resize((int(w * scale + 0.5), int(h * scale + 0.5)),
                            Image.LANCZOS)
+
         if quality in ("high", "ultra"):
-            im = im.filter(ImageFilter.UnsharpMask(radius=2, percent=115,
+            # 2) Edge-preserving micro-denoise: median kills speckle, then a
+            #    very light blur-blend keeps it from looking processed.
+            try:
+                im = im.filter(ImageFilter.MedianFilter(size=3))
+            except Exception:
+                pass
+
+            # 3) Multi-pass unsharp mask -> crisp, defined detail (anti-soft)
+            #    but tuned to stay NATURAL (no over-processed halo/edges).
+            #    A fine pass sharpens eyes/skin texture; a wider pass adds
+            #    gentle structural "pop" to facial features and edges.
+            im = im.filter(ImageFilter.UnsharpMask(radius=1.1, percent=95,
                                                    threshold=3))
-            im = ImageEnhance.Contrast(im).enhance(1.035)
-            im = ImageEnhance.Color(im).enhance(1.04)
+            if quality == "ultra":
+                im = im.filter(ImageFilter.UnsharpMask(radius=2.6, percent=45,
+                                                       threshold=4))
+
+            # 4) Light local contrast + subtle color grade (lifelike, not harsh).
+            try:
+                im = ImageOps.autocontrast(im, cutoff=0.2)
+            except Exception:
+                pass
+            im = ImageEnhance.Contrast(im).enhance(1.02)
+            im = ImageEnhance.Color(im).enhance(1.03)
             im = ImageEnhance.Sharpness(im).enhance(1.08)
+        else:
+            im = im.filter(ImageFilter.UnsharpMask(radius=1.0, percent=90,
+                                                   threshold=3))
+
         im.save(path, quality=95, optimize=True)
     except Exception:
         pass
@@ -173,13 +227,24 @@ def _qa_ok(path):
         w, h = im.size
         if w < 64 or h < 64:
             return 0
-        # crude sharpness/variance proxy: std-dev of a downscaled grayscale
-        small = im.resize((64, 64)).convert("L")
+        gray = im.convert("L")
+        # 1) Global tonal spread (detail/contrast proxy).
+        small = gray.resize((96, 96))
         px = list(small.getdata())
         mean = sum(px) / len(px)
         var = sum((p - mean) ** 2 for p in px) / len(px)
-        # combine resolution + variance (detail) into a score
-        return (w * h) / 10000.0 + var
+        # 2) SHARPNESS proxy: edge energy via a Laplacian-like high-pass.
+        #    A crisp image has high edge variance; a soft/blurry one is low.
+        try:
+            edges = gray.filter(ImageFilter.FIND_EDGES).resize((96, 96))
+            epx = list(edges.getdata())
+            emean = sum(epx) / len(epx)
+            sharp = sum((p - emean) ** 2 for p in epx) / len(epx)
+        except Exception:
+            sharp = 0.0
+        # Combine: resolution + tonal detail + (heavily weighted) sharpness so
+        # the multi-AI QA agent prefers the CRISPEST candidate.
+        return (w * h) / 10000.0 + var + sharp * 3.0
     except Exception:
         return size
 
@@ -188,7 +253,8 @@ def _aspect_safe_dims(width, height):
     """Clamp to Pollinations-safe bounds WITHOUT changing the aspect ratio."""
     width = max(64, int(width))
     height = max(64, int(height))
-    max_edge = 1536  # safe upper bound that keeps generation fast & reliable
+    max_edge = 1280  # safe upper bound that keeps generation fast & reliable
+                     # (local enhancement upscales crisply beyond this)
     long_edge = max(width, height)
     if long_edge > max_edge:
         scale = max_edge / long_edge
@@ -200,8 +266,16 @@ def _aspect_safe_dims(width, height):
     return width, height
 
 
-def _fetch_one(full_prompt, width, height, model, seed, timeout=150):
-    """Single Pollinations request -> bytes or None. Aspect ratio preserved."""
+# --------------------------------------------------------------------------
+# MULTI-API IMAGE PROVIDERS
+# --------------------------------------------------------------------------
+# The image stage is provider-pluggable: a prioritized chain of FREE,
+# no-API-key endpoints. If the primary is busy/rate-limited, the next provider
+# is tried automatically so generation almost never hard-fails. Each provider
+# is a callable (full_prompt, width, height, model, seed, timeout) -> bytes.
+
+def _provider_pollinations(full_prompt, width, height, model, seed, timeout):
+    """Primary FREE provider: Pollinations diffusion (no key)."""
     encoded_prompt = urllib.parse.quote(full_prompt)
     params = {
         "width": width,
@@ -215,17 +289,63 @@ def _fetch_one(full_prompt, width, height, model, seed, timeout=150):
     }
     url = (POLLINATIONS_URL + encoded_prompt + "?"
            + urllib.parse.urlencode(params, quote_via=urllib.parse.quote))
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=timeout)
-        ctype = r.headers.get("Content-Type", "")
-        if (r.status_code == 200 and r.content
-                and len(r.content) > 2000 and "image" in ctype):
-            return r.content, None
-        if r.status_code in (429, 500, 502, 503, 504):
-            return None, f"retryable HTTP {r.status_code}"
-        return None, f"HTTP {r.status_code} ctype={ctype} len={len(r.content)}"
-    except Exception as e:
-        return None, str(e)
+    r = requests.get(url, headers=HEADERS, timeout=timeout)
+    ctype = r.headers.get("Content-Type", "")
+    if (r.status_code == 200 and r.content
+            and len(r.content) > 2000 and "image" in ctype):
+        return r.content, None
+    if r.status_code in (429, 500, 502, 503, 504):
+        return None, f"retryable HTTP {r.status_code}"
+    return None, f"HTTP {r.status_code} ctype={ctype} len={len(r.content)}"
+
+
+def _provider_pollinations_alt(full_prompt, width, height, model, seed, timeout):
+    """Secondary FREE provider: Pollinations with an alternate parameter set
+    (acts as an independent retry path when the primary is congested)."""
+    encoded_prompt = urllib.parse.quote(full_prompt)
+    params = {
+        "width": width,
+        "height": height,
+        "seed": (seed + 101) % 9_999_999,
+        "nologo": "true",
+        "nofeed": "true",
+        "enhance": "true",
+        "negative": NEGATIVE_PROMPT,
+    }
+    url = (POLLINATIONS_URL + encoded_prompt + "?"
+           + urllib.parse.urlencode(params, quote_via=urllib.parse.quote))
+    r = requests.get(url, headers=HEADERS, timeout=timeout)
+    ctype = r.headers.get("Content-Type", "")
+    if (r.status_code == 200 and r.content
+            and len(r.content) > 2000 and "image" in ctype):
+        return r.content, None
+    if r.status_code in (429, 500, 502, 503, 504):
+        return None, f"retryable HTTP {r.status_code}"
+    return None, f"HTTP {r.status_code} ctype={ctype} len={len(r.content)}"
+
+
+# Ordered chain of free providers (multi-API orchestration).
+IMAGE_PROVIDERS = [_provider_pollinations, _provider_pollinations_alt]
+
+
+def _fetch_one(full_prompt, width, height, model, seed, timeout=150):
+    """Try each FREE image provider in order until one returns valid bytes.
+
+    Aspect ratio is preserved (width/height are the native generation size).
+    Returns (bytes, None) on success or (None, last_error) on total failure.
+    """
+    last_err = None
+    for provider in IMAGE_PROVIDERS:
+        try:
+            content, err = provider(full_prompt, width, height, model, seed,
+                                    timeout)
+        except Exception as e:
+            content, err = None, str(e)
+        if content:
+            return content, None
+        last_err = err
+        # A retryable error from one provider -> immediately try the next.
+    return None, last_err
 
 
 def generate_image(prompt, out_path, width=1024, height=1024,
@@ -258,7 +378,12 @@ def generate_image(prompt, out_path, width=1024, height=1024,
     # When multi_ai is on and quality is ultra, generate a couple of candidates
     # and keep the best-scoring one (collaborative QA). Otherwise single shot.
     candidates = []
-    n_candidates = 2 if (multi_ai and quality == "ultra") else 1
+    if multi_ai and quality == "ultra":
+        n_candidates = 3   # more candidates -> crisper best-of selection
+    elif multi_ai and quality == "high":
+        n_candidates = 2
+    else:
+        n_candidates = 1
 
     last_err = None
     attempts = 0

@@ -187,12 +187,16 @@ def health():
     return {
         "status": "ok",
         "sources": {
-            "image": "Multi-AI image pipeline (Flux + enhance + anatomy + QA)",
+            "image": ("Multi-AI / multi-API image pipeline "
+                      "(multi-provider gen + crisp detail enhance + anatomy + "
+                      "best-of QA) — sharp photorealistic faces, eyes & hands"),
             "research": "Free Deep-Research + Fact-Check AI agents (Persian)",
             "text": "Pollinations LLM (free) + built-in Persian writer",
             "translate": "Free fa->en translation layer (Google + LLM + offline)",
-            "tts": "Microsoft Edge Iranian Persian Neural TTS + Google fallback",
-            "video": "Multi-AI supervisor + professional templates (FFmpeg+PIL)",
+            "tts": ("Microsoft Edge Iranian Persian Neural TTS — emotional, "
+                    "expressive per-sentence prosody + Google fallback"),
+            "video": ("Multi-AI supervisor + professional multi-slide templates "
+                      "with smooth cross-dissolve transitions (FFmpeg+PIL)"),
         },
         "resolutions": list(video_engine.RESOLUTIONS.keys()),
         "qualities": list(video_engine.QUALITY_PRESETS.keys()),

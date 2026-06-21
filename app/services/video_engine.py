@@ -590,8 +590,76 @@ def _make_scene_clip(image_path, audio_path, out_clip, w, h, caption,
     return out_clip, duration
 
 
+def _clip_duration(path):
+    """Precise clip duration (seconds) via ffprobe; 0.0 on failure."""
+    return ai_tts.get_audio_duration(path)
+
+
+# Cinematic transition styles rotated across scene cuts for a dynamic,
+# premium feel. All are supported by FFmpeg's `xfade` filter.
+_XFADE_STYLES = ["fade", "slideleft", "smoothleft", "fadeblack",
+                 "wiperight", "circleopen", "dissolve", "slideup"]
+
+
+def _concat_clips_xfade(clip_paths, out_path, qp, transition=0.5):
+    """Concatenate scene clips with SMOOTH cross-dissolve transitions.
+
+    Uses frame-accurate `xfade` (video) + `acrossfade` (audio), chaining clips
+    with a short overlap so each slide melts elegantly into the next — a premium,
+    high-budget look instead of hard cuts. Falls back to plain concat on error.
+
+    The transition duration is clamped so it never exceeds a fraction of the
+    shortest clip (keeps audio/video perfectly in sync, no overruns).
+    """
+    n = len(clip_paths)
+    if n == 1:
+        # single clip -> just remux with faststart
+        _run(["ffmpeg", "-y", "-i", clip_paths[0], "-c", "copy",
+              "-movflags", "+faststart", out_path])
+        return out_path
+
+    durs = [max(0.1, _clip_duration(c)) for c in clip_paths]
+    # transition must be < shortest clip; keep it subtle & frame-aligned
+    td = min(transition, max(0.2, min(durs) * 0.5))
+    fps = qp["fps"]
+
+    inputs = []
+    for c in clip_paths:
+        inputs += ["-i", c]
+
+    # Build the xfade/acrossfade chain. offset_k = sum(dur[0..k]) - (k+1)*td
+    vfc = []
+    afc = []
+    prev_v = "[0:v]"
+    prev_a = "[0:a]"
+    elapsed = durs[0]
+    for k in range(1, n):
+        style = _XFADE_STYLES[(k - 1) % len(_XFADE_STYLES)]
+        offset = max(0.0, elapsed - td)
+        vout = f"[v{k}]"
+        aout = f"[a{k}]"
+        vfc.append(f"{prev_v}[{k}:v]xfade=transition={style}:duration={td:.3f}:"
+                   f"offset={offset:.3f}{vout}")
+        afc.append(f"{prev_a}[{k}:a]acrossfade=d={td:.3f}{aout}")
+        prev_v, prev_a = vout, aout
+        # after an xfade the combined timeline shortens by td
+        elapsed = elapsed + durs[k] - td
+
+    filter_complex = ";".join(vfc + afc)
+    cmd = ["ffmpeg", "-y"] + inputs + [
+        "-filter_complex", filter_complex,
+        "-map", prev_v, "-map", prev_a,
+        "-r", str(fps),
+        "-c:v", "libx264", "-preset", qp["x264"], "-crf", qp["crf"],
+        "-pix_fmt", "yuv420p", "-movflags", "+faststart",
+        "-c:a", "aac", "-b:a", "192k", "-ar", "44100", "-ac", "2",
+        out_path]
+    _run(cmd)
+    return out_path
+
+
 def _concat_clips(clip_paths, out_path):
-    """Concatenate scene clips with stream-copy (near-instant)."""
+    """Concatenate scene clips with stream-copy (near-instant). Hard-cut fallback."""
     listfile = out_path + ".concat.txt"
     with open(listfile, "w") as f:
         for c in clip_paths:
@@ -708,10 +776,16 @@ def build_video(script, resolution="1280x720", language="en", voice=None,
                          template=tpl, title=slide_title)
         clips.append(clip_path)
 
-    report("concat", n, "ترکیب صحنه‌ها و آماده‌سازی خروجی")
+    report("concat", n, "ترکیب صحنه‌ها با ترنزیشن‌های نرم و آماده‌سازی خروجی")
     if out_path is None:
         out_path = os.path.join(workdir, "final.mp4")
-    _concat_clips(clips, out_path)
+    # Prefer SMOOTH cross-dissolve transitions for a premium, cinematic flow.
+    # Fall back to a clean hard-cut concat if the xfade graph fails for any
+    # reason (keeps the pipeline unbreakable).
+    try:
+        _concat_clips_xfade(clips, out_path, qp, transition=0.55)
+    except Exception:
+        _concat_clips(clips, out_path)
     report("done", n, "ویدیو آماده شد")
     return out_path
 

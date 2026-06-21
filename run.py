@@ -40,10 +40,14 @@ APP_HOME = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else
 sys.path.insert(0, BASE)
 os.environ.setdefault("AISTUDIO_HOME", APP_HOME)
 
-# bundled ffmpeg dir (if present) takes priority
-_bundled_ffmpeg = os.path.join(BASE, "ffmpeg")
-if os.path.isdir(_bundled_ffmpeg):
-    os.environ["PATH"] = _bundled_ffmpeg + os.pathsep + os.environ.get("PATH", "")
+# Bundled/persistent ffmpeg dirs (if present) take priority on PATH so the
+# locally-installed FFmpeg from a previous run is detected INSTANTLY and we
+# never re-download it. We register both the read-only bundle dir (next to the
+# code, used inside a frozen EXE) and the writable persistent dir next to the
+# app home (where one-time downloads are saved).
+for _ff in (os.path.join(BASE, "ffmpeg"), os.path.join(APP_HOME, "ffmpeg")):
+    if os.path.isdir(_ff) and _ff not in os.environ.get("PATH", "").split(os.pathsep):
+        os.environ["PATH"] = _ff + os.pathsep + os.environ.get("PATH", "")
 
 
 # --------------------------------------------------------------------------
@@ -133,47 +137,111 @@ def ensure_dependencies():
 
 
 # --------------------------------------------------------------------------
-# 3. FFmpeg
+# 3. FFmpeg  (PERSISTENT, ONE-TIME INSTALL)
 # --------------------------------------------------------------------------
+# The local, persistent install location for a bundled FFmpeg.  Once FFmpeg is
+# downloaded here it is reused FOREVER — subsequent runs detect it instantly and
+# skip the (~80MB) download entirely.  A tiny marker file records a successful
+# install so we never re-download even if PATH lookups are slow.
+FFMPEG_DIR = os.path.join(APP_HOME, "ffmpeg")
+FFMPEG_MARKER = os.path.join(FFMPEG_DIR, ".installed")
+
+
+def _exe(name):
+    """Return the platform-specific executable filename."""
+    return name + (".exe" if platform.system().lower() == "windows" else "")
+
+
+def _local_ffmpeg_paths():
+    """Paths to a locally-bundled ffmpeg/ffprobe (may or may not exist yet)."""
+    return (os.path.join(FFMPEG_DIR, _exe("ffmpeg")),
+            os.path.join(FFMPEG_DIR, _exe("ffprobe")))
+
+
+def _local_ffmpeg_present():
+    """True if a previously-installed local FFmpeg exists on disk."""
+    fm, fp = _local_ffmpeg_paths()
+    return os.path.isfile(fm) and os.path.isfile(fp)
+
+
+def _register_local_ffmpeg():
+    """Prepend the local ffmpeg dir to PATH so shutil.which / subprocess find it."""
+    if os.path.isdir(FFMPEG_DIR):
+        cur = os.environ.get("PATH", "")
+        if FFMPEG_DIR not in cur.split(os.pathsep):
+            os.environ["PATH"] = FFMPEG_DIR + os.pathsep + cur
+
+
 def _ffmpeg_ok():
+    """True if BOTH ffmpeg and ffprobe are resolvable (local bundle or system)."""
     return bool(shutil.which("ffmpeg")) and bool(shutil.which("ffprobe"))
 
 
 def _download_ffmpeg_windows():
-    """Best-effort auto-download of a static FFmpeg build on Windows."""
+    """One-time auto-download of a static FFmpeg build on Windows."""
     try:
         import zipfile, urllib.request, tempfile
         url = ("https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/"
                "ffmpeg-master-latest-win64-gpl.zip")
-        info("Downloading FFmpeg for Windows (~80MB, one-time)...")
+        info("Downloading FFmpeg for Windows (~80MB, ONE-TIME only)...")
         tmpzip = os.path.join(tempfile.gettempdir(), "ffmpeg_dl.zip")
         urllib.request.urlretrieve(url, tmpzip)
-        dest = os.path.join(BASE, "ffmpeg")
-        os.makedirs(dest, exist_ok=True)
+        os.makedirs(FFMPEG_DIR, exist_ok=True)
         with zipfile.ZipFile(tmpzip) as z:
             for member in z.namelist():
                 name = os.path.basename(member)
                 if name.lower() in ("ffmpeg.exe", "ffprobe.exe"):
-                    with z.open(member) as src, open(os.path.join(dest, name), "wb") as out:
+                    with z.open(member) as src, \
+                            open(os.path.join(FFMPEG_DIR, name), "wb") as out:
                         shutil.copyfileobj(src, out)
-        os.environ["PATH"] = dest + os.pathsep + os.environ.get("PATH", "")
         try: os.unlink(tmpzip)
         except Exception: pass
-        return _ffmpeg_ok()
+        return _local_ffmpeg_present()
     except Exception as e:
         warn("Auto-download of FFmpeg failed: " + str(e))
         return False
 
 
+def _mark_installed():
+    """Persist a marker so future runs skip the download instantly."""
+    try:
+        os.makedirs(FFMPEG_DIR, exist_ok=True)
+        with open(FFMPEG_MARKER, "w", encoding="utf-8") as f:
+            f.write("ffmpeg installed by Free AI Studio\n")
+    except Exception:
+        pass
+
+
 def ensure_ffmpeg():
+    """Guarantee FFmpeg is available.  Download AT MOST ONCE, ever.
+
+    Order of checks (fast path first → instant startup on every later run):
+      1. A previously-installed LOCAL bundle (ffmpeg/ + .installed marker).
+      2. A system-wide ffmpeg already on PATH.
+      3. (Windows only) ONE-TIME auto-download into the local bundle dir.
+    """
     info("Checking FFmpeg...")
-    if _ffmpeg_ok():
-        ok("FFmpeg & FFprobe found.")
+
+    # 1) Persistent local bundle from a previous run → reuse instantly.
+    if _local_ffmpeg_present():
+        _register_local_ffmpeg()
+        if not os.path.exists(FFMPEG_MARKER):
+            _mark_installed()
+        ok("FFmpeg found locally (cached install — no download needed).")
         return
+
+    # 2) System install already on PATH.
+    if _ffmpeg_ok():
+        ok("FFmpeg & FFprobe found on system PATH.")
+        return
+
+    # 3) No FFmpeg anywhere → install exactly once.
     sysname = platform.system().lower()
     if sysname == "windows":
-        if _download_ffmpeg_windows() and _ffmpeg_ok():
-            ok("FFmpeg installed locally.")
+        if _download_ffmpeg_windows() and _local_ffmpeg_present():
+            _register_local_ffmpeg()
+            _mark_installed()
+            ok("FFmpeg installed locally (one-time). Future runs start instantly.")
             return
         err("FFmpeg not found. Download it from https://ffmpeg.org/download.html "
             "and add it to PATH, then re-run.")
